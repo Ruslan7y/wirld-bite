@@ -1,0 +1,57 @@
+/* World Bite chefs: Leyla nənə, Şef Aylin, Zeynep teyze (original characters).
+   chefSVG(id, mood) → inline SVG (viewBox 0 0 200 240). mood: 'happy' | 'wow' | 'wink'. */
+const CHEFS = {
+  leyla: { id: 'leyla', name: { tr: 'Leyla nənə', az: 'Leyla nənə', en: 'Grandma Leyla', ru: 'Бабушка Лейла' }, tag: { tr: 'Sevimli büyükanne', az: 'Mehriban nənə', en: 'Lovely grandma', ru: 'Добрая бабушка' }, color: '#7C4A3A' },
+  aylin: { id: 'aylin', name: { tr: 'Şef Aylin', az: 'Şef Aylin', en: 'Chef Aylin', ru: 'Шеф Айлин' }, tag: { tr: 'Genç ve neşeli şef', az: 'Gənc və şən aşpaz', en: 'Young, cheerful chef', ru: 'Молодой весёлый шеф' }, color: '#E0482F' },
+  zeynep: { id: 'zeynep', name: { tr: 'Zeynep teyze', az: 'Zeynəb xala', en: 'Auntie Zeynep', ru: 'Тётя Зейнеп' }, tag: { tr: 'Sıcak, misafirperver teyze', az: 'Qonaqpərvər xala', en: 'Warm, welcoming auntie', ru: 'Радушная тётя' }, color: '#2F6F62' }
+};
+function chefMouth(mood) {
+  return mood === 'wow' ? '<ellipse cx="100" cy="166" rx="9" ry="11" fill="#8A3B2E"/>'
+    : '<path d="M84 160 Q100 178 116 160" fill="none" stroke="#8A3B2E" stroke-width="4" stroke-linecap="round"/>';
+}
+function chefEyes(mood, y, dx) {
+  const l = 100 - dx, r = 100 + dx;
+  if (mood === 'wink') return `<ellipse cx="${l}" cy="${y}" rx="5" ry="6.5" fill="#2B1D14"/><path d="M${r - 7} ${y} Q${r} ${y - 6} ${r + 7} ${y}" fill="none" stroke="#2B1D14" stroke-width="3.5" stroke-linecap="round"/>`;
+  return `<ellipse cx="${l}" cy="${y}" rx="5" ry="6.5" fill="#2B1D14"/><ellipse cx="${r}" cy="${y}" rx="5" ry="6.5" fill="#2B1D14"/><circle cx="${l + 2}" cy="${y - 3}" r="1.6" fill="#fff"/><circle cx="${r + 2}" cy="${y - 3}" r="1.6" fill="#fff"/>`;
+}
+function chefSVG(id, mood = 'happy') {
+  const body = {
+    leyla: `<path d="M30 240 Q30 205 100 200 Q170 205 170 240 Z" fill="#7C4A3A"/><path d="M58 240 L62 222 Q100 236 138 222 L142 240 Z" fill="#F4EBDD"/>
+      <rect x="88" y="182" width="24" height="22" rx="6" fill="#F2C7A5"/>
+      <circle cx="100" cy="135" r="52" fill="#F5CFAE"/>
+      <path d="M50 130 Q48 78 100 76 Q152 78 150 130 Q140 100 100 100 Q60 100 50 130 Z" fill="#C9CCD3"/><circle cx="100" cy="72" r="20" fill="#C9CCD3"/>
+      ${chefEyes(mood, 136, 20)}
+      <circle cx="80" cy="135" r="13" fill="none" stroke="#5B4636" stroke-width="3"/><circle cx="120" cy="135" r="13" fill="none" stroke="#5B4636" stroke-width="3"/><line x1="93" y1="135" x2="107" y2="135" stroke="#5B4636" stroke-width="3"/>
+      <circle cx="68" cy="158" r="8" fill="#F2A7A0"/><circle cx="132" cy="158" r="8" fill="#F2A7A0"/>`,
+    aylin: `<path d="M30 240 Q30 205 100 200 Q170 205 170 240 Z" fill="#FFFFFF" stroke="#D9D4CB" stroke-width="2"/><path d="M78 204 L100 230 L122 204 Z" fill="#E0482F"/>
+      <rect x="88" y="182" width="24" height="22" rx="6" fill="#E6B48E"/>
+      <path d="M150 120 Q178 150 160 200 Q150 170 140 150 Z" fill="#4A2C20"/>
+      <circle cx="100" cy="135" r="50" fill="#EDC09A"/>
+      <path d="M52 128 Q54 92 100 90 Q146 92 148 128 Q128 108 100 112 Q72 108 52 128 Z" fill="#4A2C20"/>
+      <path d="M52 92 Q48 52 76 50 Q84 26 100 34 Q116 26 124 50 Q152 52 148 92 Z" fill="#FFFFFF" stroke="#D9D4CB" stroke-width="2"/><rect x="54" y="84" width="92" height="14" rx="4" fill="#FFFFFF" stroke="#D9D4CB" stroke-width="2"/>
+      ${chefEyes(mood, 136, 18)}
+      <circle cx="70" cy="156" r="8" fill="#F2A08F"/><circle cx="130" cy="156" r="8" fill="#F2A08F"/>`,
+    zeynep: `<path d="M30 240 Q30 205 100 200 Q170 205 170 240 Z" fill="#2F6F62"/><path d="M58 240 L62 222 Q100 236 138 222 L142 240 Z" fill="#FCE7C8"/>
+      <path d="M44 140 Q40 70 100 64 Q160 70 156 140 Q160 196 120 206 L80 206 Q40 196 44 140 Z" fill="#B83A5E"/>
+      <circle cx="70" cy="100" r="5" fill="#F7C3D3"/><circle cx="128" cy="96" r="5" fill="#F7C3D3"/><circle cx="100" cy="80" r="5" fill="#F7C3D3"/><circle cx="58" cy="150" r="5" fill="#F7C3D3"/><circle cx="142" cy="150" r="5" fill="#F7C3D3"/>
+      <ellipse cx="100" cy="140" rx="40" ry="46" fill="#EFC29C"/>
+      ${mood === 'happy' ? '<path d="M76 136 Q82 129 88 136" fill="none" stroke="#2B1D14" stroke-width="3.5" stroke-linecap="round"/><path d="M112 136 Q118 129 124 136" fill="none" stroke="#2B1D14" stroke-width="3.5" stroke-linecap="round"/>' : chefEyes(mood, 136, 18)}
+      <circle cx="74" cy="156" r="7" fill="#F2A08F"/><circle cx="126" cy="156" r="7" fill="#F2A08F"/>`
+  }[id] || '';
+  return `<svg viewBox="0 0 200 240" xmlns="http://www.w3.org/2000/svg" class="chef chef-${id}">${body}${chefMouth(mood)}</svg>`;
+}
+/* Which chef cooks with the user: by age (default), by dish region, random, or fixed. */
+const DISH_REGION_CHEF = { europe: 'aylin', americas: 'aylin', oceania: 'aylin', asia: 'leyla', africa: 'zeynep' };
+const LEYLA_LANDS = ['AZ', 'TR', 'GE', 'AM', 'IR', 'UZ', 'KZ', 'KG', 'TJ', 'TM', 'RU', 'UA', 'BY'];
+const ZEYNEP_LANDS = ['LB', 'SY', 'JO', 'PS', 'IQ', 'EG', 'MA', 'DZ', 'TN', 'LY', 'SA', 'AE', 'QA', 'KW', 'BH', 'OM', 'YE', 'GR', 'CY', 'AL', 'BA', 'MK'];
+function chefFor(mode, age, countryCode, cont, seed) {
+  if (CHEFS[mode]) return mode;
+  if (mode === 'random') return ['leyla', 'aylin', 'zeynep'][Math.abs(seed || Date.now()) % 3];
+  if (mode === 'dish' && countryCode) {
+    if (LEYLA_LANDS.includes(countryCode)) return 'leyla';
+    if (ZEYNEP_LANDS.includes(countryCode)) return 'zeynep';
+    return DISH_REGION_CHEF[cont] || 'aylin';
+  }
+  const a = +age || 30;
+  return a < 30 ? 'aylin' : a < 55 ? 'zeynep' : 'leyla';
+}

@@ -260,7 +260,7 @@ const Kitchen = (() => {
       $$('.k-chip', el).forEach((c, i) => { c.style.animationDelay = (i * 0.07) + 's'; c.classList.add('pop'); });
       $('#kItems').innerHTML = `<div class="k-mise">${items.slice(0, 8).map((x, i) => `<span style="animation-delay:${i * 0.12}s">${x.emoji}</span>`).join('')}</div>`;
       const n = R.nutri;
-      $('#kCard').innerHTML = `<div class="k-intro"><h2>${t('miseTitle')}</h2><p>${t('miseText', { n: items.length, s: steps.length })}</p>
+      $('#kCard').innerHTML = `${R.chef ? `<div class="k-chef"><div class="k-chef-av">${chefSVG(R.chef.id, 'happy')}</div><div class="bubble">${esc(t('chefHello', { n: R.chef.name }))}</div></div>` : ''}<div class="k-intro"><h2>${t('miseTitle')}</h2><p>${t('miseText', { n: items.length, s: steps.length })}</p>
         <div class="k-meta"><span>⏱ ${R.time || ''}</span><span>👥 ${R.servings} ${t('servings')}</span>${n ? `<span>🔥 ${n.kcal} kcal</span>` : ''}</div></div>`;
       $('#kNav').innerHTML = `<button class="btn primary block k-go" id="kStart">▶ ${t('startCooking')}</button>`;
       $('#kStart').onclick = () => go(0);
@@ -321,7 +321,7 @@ const Kitchen = (() => {
       items.forEach(x => x.used = true); drawTray();
       $('#kStage').classList.add('served');
       $('#kItems').innerHTML = plateHTML('k-plated');
-      $('#kCard').innerHTML = `<div class="k-step"><div class="k-act">🎉 ${t('bonApp')}</div>
+      $('#kCard').innerHTML = `${R.chef ? `<div class="k-chef"><div class="k-chef-av">${chefSVG(R.chef.id, 'wink')}</div><div class="bubble">${esc(t('chefDone'))}</div></div>` : ''}<div class="k-step"><div class="k-act">🎉 ${t('bonApp')}</div>
         <p>${esc(servingText || t('serveDefault'))}</p>
         ${sides.length ? `<div class="k-tags"><span class="k-tag c">🍽️ <b>${t('serveWith')}:</b> ${esc(sides.join(', '))}</span></div>` : ''}</div>`;
       $('#kNav').innerHTML = `<button class="btn line" id="kAgain">↺</button><button class="btn ghost" id="kCam">📷 ${t('seeOnTable')}</button><button class="btn primary" id="kDone">${t('finish')} ✓</button>`;

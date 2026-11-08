@@ -14,7 +14,9 @@
 | Açılış | 3 saniyelik animasyon: küre döner, uçak ters yönde döner, **WORLD BITE** harf harf belirir |
 | Tanıtım | 4 adımlı tanıtım (kaydırılabilir) |
 | Giriş | Giriş yap / Hesap oluştur · Gmail · Facebook · e-posta (demo: bilgiler cihazda saklanır) |
-| Keşfet | Arama, günlük/haftalık popüler yemekler, adım adım tarifler, 196 ülke, kategori ve kıta filtresi |
+| Keşfet | Liste / Harita seçici, ülke-şehir-yemek-malzeme araması, sıralama (A-Z, kıta, popüler, kalori, süre), günlük/haftalık popüler, 196 ülke |
+| Dünya haritası | İnternetsiz; ülke seçilince kırmızıya döner, kamera ülkeye uçar, şehirler belirir; şehre dokununca meşhur yemekleri (37 ülke, 138 şehir, 232 yemek) |
+| Şef karakterleri | Leyla nənə, Şef Aylin, Zeynep teyze — yaşa, yemeğe göre ya da rastgele |
 | Ülke sayfası | İmza yemek, fotoğraf, güçlü olduğu alan (kahvaltı / ana yemek / ara sıcak / tatlı), hikaye, açıklama |
 | Seyahat | Önce konum izni; yakındaki restoranlar uygulama içinde liste + vektör harita (MapLibre/OpenFreeMap). Gemini anahtarı varsa Google Haritalar puan ve yorumlarıyla. Tüm aramalar telefonda saklanır |
 | Mutfak animasyonu | Her tarif için: malzemeler kaba uçar ve listeden çıkar, yumurta kırma, çırpma, doğrama, kızartma, kaynatma, fırın; kıvam bilgisi, süre ve zamanlayıcı, atla, servis sunumu, kamerada "masada gör" |

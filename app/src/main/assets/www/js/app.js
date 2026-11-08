@@ -145,7 +145,7 @@ function dishName(c) {
 const recName = r => r.name[cl()] || r.name.en;
 
 /* ---------- favourites & popularity ---------- */
-const fav = () => store.get('fav', { dishes: [], recipes: [], rests: [] });
+const fav = () => Object.assign({ dishes: [], recipes: [], rests: [], cdishes: [] }, store.get('fav', {}));
 const setFav = f => store.set('fav', f);
 const isFav = (type, id) => type === 'rests' ? fav().rests.some(r => r.id === id) : fav()[type].includes(id);
 function toggleFav(type, id, obj) {
@@ -153,7 +153,7 @@ function toggleFav(type, id, obj) {
   if (type === 'rests') { const i = f.rests.findIndex(r => r.id === id); on = i < 0; on ? f.rests.unshift(obj) : f.rests.splice(i, 1); }
   else { const i = f[type].indexOf(id); on = i < 0; on ? f[type].unshift(id) : f[type].splice(i, 1); }
   setFav(f);
-  if (type !== 'rests') { const likes = store.get('likes', {}); const key = type === 'recipes' ? recipeById[id].country : id; on ? (likes[key] = Date.now()) : delete likes[key]; store.set('likes', likes); }
+  if (type !== 'rests') { const likes = store.get('likes', {}); const key = type === 'recipes' ? recipeById[id].country : type === 'cdishes' ? (CITY_DISHES.find(d => d.id === id) || {}).code : id; on ? (likes[key] = Date.now()) : delete likes[key]; store.set('likes', likes); }
   toast(on ? t('saved') : t('removed'));
   return on;
 }
@@ -178,7 +178,7 @@ function popScore(c, p) {
 const fmtN = n => n >= 1000 ? (n / 1000).toFixed(1).replace('.0', '') + 'k' : String(n);
 
 /* ---------- state & navigation ---------- */
-const state = { tab: 'explore', pop: store.get('pop', 'd'), cat: 'all', cont: 'all', q: '', tmode: 'near', city: store.get('city', ''), coords: null, cuisine: '', trip: '', results: [], resLabel: '' };
+const state = { view: store.get('exView', 'list'), sort: store.get('sort', 'az'), tab: 'explore', pop: store.get('pop', 'd'), cat: 'all', cont: 'all', q: '', tmode: 'near', city: store.get('city', ''), coords: null, cuisine: '', trip: '', results: [], resLabel: '' };
 const stack = [];
 let lastPush = 0, lastBackAtRoot = 0;
 function pushPage(html, mount, cls) {
@@ -283,7 +283,8 @@ function drawAuth() {
     <button class="social" data-p="google">${I.google}${t('withGoogle')}</button>
     <button class="social" data-p="facebook">${I.facebook}${t('withFacebook')}</button>
     <div class="divider">${t('or')}</div>
-    ${reg ? `<div class="field"><span class="ic">${I.user}</span><input id="aName" placeholder="${t('name')}" autocomplete="name"></div>` : ''}
+    ${reg ? `<div class="field"><span class="ic">${I.user}</span><input id="aName" placeholder="${t('name')}" autocomplete="name"></div>
+    <div class="field"><span class="ic">🎂</span><input id="aAge" type="number" inputmode="numeric" min="5" max="120" placeholder="${t('age')}"></div>` : ''}
     <div class="field"><span class="ic">${I.mail}</span><input id="aEmail" type="email" placeholder="${t('email')}" autocomplete="email"></div>
     <div class="field"><span class="ic">${I.lock}</span><input id="aPw" type="password" placeholder="${t('password')}" autocomplete="${reg ? 'new-password' : 'current-password'}"></div>
     <div class="err" id="aErr"></div>
@@ -297,13 +298,15 @@ function drawAuth() {
 }
 async function submitAuth() {
   const reg = authMode === 'register', err = $('#aErr');
+  const age = reg ? parseInt($('#aAge').value, 10) : 0;
   const name = reg ? $('#aName').value.trim() : '', email = $('#aEmail').value.trim().toLowerCase(), pw = $('#aPw').value;
   if (!email || !pw || (reg && !name)) return err.textContent = t('fillAll');
   if (pw.length < 6) return err.textContent = t('pwShort');
+  if (reg && !(age >= 5 && age <= 120)) return err.textContent = t('ageErr');
   const users = store.get('users', []), h = await sha(email + ':' + pw);
   if (reg) {
     if (users.some(u => u.email === email)) return err.textContent = t('exists');
-    const u = { name, email, pw: h, provider: 'email' }; users.push(u); store.set('users', users); login(u);
+    const u = { name, email, pw: h, provider: 'email', age }; users.push(u); store.set('users', users); login(u);
   } else {
     const u = users.find(u => u.email === email && u.pw === h);
     if (!u) return err.textContent = t('wrongLogin');
@@ -317,16 +320,34 @@ function socialAuth(p) {
     <div style="display:flex;flex-direction:column;gap:12px">
       <div class="field"><span class="ic">${I.user}</span><input id="sName" placeholder="${t('name')}"></div>
       <div class="field"><span class="ic">${I.mail}</span><input id="sEmail" type="email" placeholder="${p === 'google' ? 'ad@gmail.com' : t('email')}"></div>
+      <div class="field"><span class="ic">🎂</span><input id="sAge" type="number" inputmode="numeric" min="5" max="120" placeholder="${t('age')}"></div>
       <div class="err" id="sErr"></div>
       <button class="btn primary block" id="sGo">${t('cont')}</button></div>`, () => {
     $('#sGo').onclick = () => {
-      const name = $('#sName').value.trim(), email = $('#sEmail').value.trim().toLowerCase();
+      const name = $('#sName').value.trim(), email = $('#sEmail').value.trim().toLowerCase(), age = parseInt($('#sAge').value, 10);
       if (!name || !email) return $('#sErr').textContent = t('fillAll');
-      closeSheet(); login({ name, email, provider: p });
+      if (!(age >= 5 && age <= 120)) return $('#sErr').textContent = t('ageErr');
+      closeSheet(); login({ name, email, provider: p, age });
     };
   });
 }
-function login(u) { store.set('session', { name: u.name, email: u.email, provider: u.provider }); enterApp(); }
+function login(u) { store.set('session', { name: u.name, email: u.email, provider: u.provider, age: u.age || 0 }); enterApp(); }
+function askAge(force) {
+  const s = store.get('session', null); if (!s || (s.age && !force)) return;
+  openSheet(`<div class="chef-row">${['aylin', 'zeynep', 'leyla'].map(id => `<div class="chef-mini">${chefSVG(id, 'happy')}</div>`).join('')}</div>
+    <h2>🎂 ${t('ageAsk')}</h2><p class="sub">${t('ageWhy')}</p>
+    <div class="field"><span class="ic">🎂</span><input id="agIn" type="number" inputmode="numeric" min="5" max="120" placeholder="${t('age')}" value="${s.age || ''}"></div>
+    <div class="err" id="agErr"></div>
+    <div class="btn-row"><button class="btn line" id="agLater">${t('later')}</button><button class="btn primary" id="agOk">${t('cont')}</button></div>`, sh => {
+    $('#agLater', sh).onclick = () => { store.set('ageSkipped', true); closeSheet(); };
+    $('#agOk', sh).onclick = () => {
+      const a = parseInt($('#agIn', sh).value, 10); if (!(a >= 5 && a <= 120)) return $('#agErr', sh).textContent = t('ageErr');
+      const ss = store.get('session', {}); ss.age = a; store.set('session', ss); closeSheet();
+      const ch = CHEFS[currentChef()]; toast(`${ch.name[lang] || ch.name.tr} 👩‍🍳`); renderSettings();
+    };
+  });
+}
+function currentChef(code) { const c = code && byCode[code]; return chefFor(store.get('chefMode', 'age'), (store.get('session', {}) || {}).age, code, c && c.cont, hash(String(code) + new Date().toDateString())); }
 
 /* ================= MAIN APP ================= */
 const TABS = ['explore', 'travel', 'pantry', 'list', 'settings'];
@@ -336,6 +357,7 @@ function enterApp() {
   show('main');
   renderExplore(); renderTravel(); renderPantry(); renderList(); renderSettings();
   setTab(state.tab);
+  if (!store.get('ageSkipped', false)) setTimeout(() => askAge(), 3800);
 }
 function setTab(k) {
   state.tab = k;
@@ -354,8 +376,11 @@ function renderExplore() {
   $('#v-explore').innerHTML = `
     <div class="top"><div><div class="hi">${esc(t('hello', { n: s.name.split(' ')[0] }))} 👋</div><h1>${t('exploreTitle')}</h1></div><div class="avatar">${esc(s.name[0] || '?').toUpperCase()}</div></div>
     <label class="search">${I.search}<input id="exQ" placeholder="${t('searchExplore')}" value="${esc(state.q)}" autocomplete="off"><button class="x ${state.q ? '' : 'hide'}" id="exX">×</button></label>
+    <div class="seg view-seg" id="exView"><span class="knob"></span><button data-v="list">📋 ${t('listView')}</button><button data-v="map">🗺️ ${t('mapView')}</button></div>
     <div id="exSearch"></div>
-    <div id="exHome">
+    <div id="exMap" class="${state.view === 'map' ? 'fade-in' : 'hide'}"><div class="wm-wrap" id="wmWrap"><div id="wmap"></div>
+      <div class="wm-hint" id="wmHint">👆 ${t('tapCountry')}</div><div class="wm-card" id="wmCard"></div></div></div>
+    <div id="exHome" class="${state.view === 'map' ? 'hide' : ''}">
       <div id="dotd"></div>
       <div class="sec"><h2>🔥 ${t('popular')}</h2><div class="mini-seg" id="popSeg"><button data-p="d">${t('daily')}</button><button data-p="w">${t('weekly')}</button></div></div>
       <div class="hscroll" id="popList"></div>
@@ -364,6 +389,7 @@ function renderExplore() {
       <div class="sec"><h2>🌍 ${t('allCountries')}</h2><small id="cCount"></small></div>
       <div class="chips" id="catChips"></div>
       <div class="chips" id="contChips" style="margin-top:8px"></div>
+      <div class="chips sort" id="sortChips" style="margin-top:8px"></div>
       <div class="grid" id="cGrid" style="margin-top:14px"></div>
       <p class="note" style="text-align:center;margin-top:18px">${t('demoPop')}</p>
     </div>`;
@@ -371,8 +397,95 @@ function renderExplore() {
   q.oninput = () => { state.q = q.value; $('#exX').classList.toggle('hide', !state.q); drawSearch(); };
   $('#exX').onclick = () => { q.value = state.q = ''; $('#exX').classList.add('hide'); drawSearch(); };
   $$('#popSeg button').forEach(b => b.onclick = () => { state.pop = b.dataset.p; store.set('pop', state.pop); renderPopular(); });
+  $$('#exView button').forEach(b => { b.classList.toggle('on', b.dataset.v === state.view); b.onclick = () => setView(b.dataset.v); });
   renderDotd(); renderPopular(); drawChips(); drawGrid(); drawSearch();
+  if (state.view === 'map') setTimeout(() => setView('map', true), 30);
 }
+function setView(v, force) {
+  if (v === 'map' && !WorldMap.supported()) { toast(t('mapNoGL')); v = 'list'; }
+  if (state.view === v && !force) return;
+  state.view = v; store.set('exView', v);
+  $$('#exView button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  const home = $('#exHome'), mp = $('#exMap');
+  if (v === 'map') {
+    home.classList.add('hide'); mp.classList.remove('hide'); mp.classList.remove('fade-in'); void mp.offsetWidth; mp.classList.add('fade-in');
+    if (!WorldMap.ready || force) WorldMap.mount($('#wmap'), { rich: Object.keys(CITIES_BY_CODE), citiesOf: code => CITIES_BY_CODE[code] || [], onCountry: wmCountry, onCity: c => openCity(c), onClear: wmClear });
+    else setTimeout(() => WorldMap.resize(), 50);
+  } else {
+    mp.classList.add('hide'); home.classList.remove('hide'); home.classList.remove('fade-in'); void home.offsetWidth; home.classList.add('fade-in');
+    if (!state.q) home.classList.remove('hide');
+  }
+  drawSearch();
+}
+function wmCountry(code) {
+  const c = byCode[code]; const card = $('#wmCard'), hint = $('#wmHint'); if (!card) return;
+  hint && hint.classList.add('hide');
+  if (!c) { card.innerHTML = `<div class="wm-in"><b>${flag(code)} ${esc(cname(code))}</b><p class="note">${t('noCountryData')}</p></div>`; card.classList.add('show'); return; }
+  const cities = CITIES_BY_CODE[code] || [];
+  card.innerHTML = `<div class="wm-in">
+    <div class="wm-head"><span class="f">${flag(code)}</span><div><b>${esc(cname(code))}</b><small>${t(c.cont)} · ★ ${t(c.strength)}</small></div><button class="round sm" id="wmX">✕</button></div>
+    <div class="wm-sig" role="button" data-open="c:${code}">${photo(code, c.wiki, c.emoji)}<div><small>${t('signature')}</small><b>${esc(dishName(c))}</b><small>⏱ ${fmtTime(sigOf(code).t)} · 🔥 ${kcalOf(code)} kcal</small></div><span class="go">›</span></div>
+    ${cities.length ? `<small class="wm-sub">🏙️ ${t('citiesN', { n: cities.length })}</small><div class="wm-cities">${cities.map((ct, i) => `<button class="chip" data-city="${ct.id}" style="animation-delay:${i * 0.06}s">${esc(ct.name)} <small>${ct.dishes.length}</small></button>`).join('')}</div>` : `<small class="wm-sub">${t('noCityYet')}</small>`}
+  </div>`;
+  card.classList.remove('show'); void card.offsetWidth; card.classList.add('show');
+  hydrate(card);
+  $('#wmX').onclick = () => WorldMap.clear();
+  $$('[data-city]', card).forEach(b => b.onclick = () => { const ct = CITIES.find(x => x.id === b.dataset.city); WorldMap.focusCity(ct); openCity(ct); });
+}
+function wmClear() { const card = $('#wmCard'); if (card) card.classList.remove('show'); const h = $('#wmHint'); h && h.classList.remove('hide'); }
+const cityDishById = Object.fromEntries(CITY_DISHES.map(d => [d.id, d]));
+const cityById = Object.fromEntries(CITIES.map(c => [c.id, c]));
+function openCity(ct) {
+  openSheet(`<div class="city-head"><span class="f">${flag(ct.code)}</span><div><h2>${esc(ct.name)}</h2><p class="sub">${esc(ct.region)} · ${esc(cname(ct.code))}</p></div></div>
+    <div class="city-dishes">${ct.dishes.map((d, i) => `<div class="cdish" role="button" data-cd="${d.id}" style="animation-delay:${i * 0.08}s">${photo(d.id, d.wiki, d.emoji)}
+      <div class="b"><b>${esc(d.name)}</b><span class="badge">${t(d.cat)}</span><p>${esc(d.desc)}</p></div></div>`).join('')}</div>
+    <div class="btn-row"><button class="btn ghost" id="ctEat">📍 ${t('whereEat')}</button><button class="btn line" id="ctCountry">${flag(ct.code)} ${t('countryPage')}</button></div>`, s => {
+    hydrate(s);
+    $$('[data-cd]', s).forEach(b => b.onclick = () => { closeSheet(); openCityDish(cityDishById[b.dataset.cd]); });
+    $('#ctEat', s).onclick = () => { closeSheet(); state.tmode = 'trip'; state.trip = ct.code; state.results = []; setTab('travel'); renderTravel(); findRestaurants(); };
+    $('#ctCountry', s).onclick = () => { closeSheet(); openCountry(ct.code); };
+  });
+}
+function matchRecipeFor(d) {
+  const sig = byCode[d.code];
+  if (sig && sig.wiki === d.wiki) return { kind: 'c', id: d.code };
+  const r = RECIPES.find(r => r.wiki === d.wiki || norm(recName(r)) === norm(d.name));
+  return r ? { kind: 'r', id: r.id } : null;
+}
+function openCityDish(d) {
+  const ct = cityById[d.city], m = matchRecipeFor(d), cached = store.get('cdr:' + d.id, null);
+  pushPage(`
+    <div class="hero">${photo(d.id, d.wiki, d.emoji, true)}
+      <div class="bar"><button class="round" data-back>${I.back}</button><span class="bar-r">${heartBtn('cdishes', d.id, 'round')}</span></div>
+      <span class="credit">${t('photoCredit')}</span></div>
+    <div class="dbody">
+      <div class="country"><span class="f">${flag(d.code)}</span>${esc(ct.name)} · ${esc(cname(d.code))}</div>
+      <h1>${esc(d.name)}</h1>
+      <div class="info-row"><span class="pill p">${d.emoji} ${t(d.cat)}</span><span class="pill">🏙️ ${esc(ct.region)}</span></div>
+      <div class="block"><h3>📜 ${t('story')}</h3><p>${esc(d.desc)}</p></div>
+      <div class="block" id="cdWiki" style="animation-delay:.08s"><h3>📖 ${t('about')}</h3><div class="sk"></div><div class="sk" style="width:70%"></div></div>
+      <div id="cdRecipe"></div>
+      <button class="btn ghost block cta" id="cdEat">📍 ${t('whereEat')}</button>
+    </div>`, el => {
+    const box = $('#cdRecipe', el);
+    const showAi = r => { box.innerHTML = `<div class="sec" style="margin-bottom:0"><h2>📝 ${t('recipe')}</h2><small>✨ Gemini</small></div>` + recipeHTML(aiToRc(r)); bindRecipe(box, aiToRc(r), d.name, { emoji: d.emoji, country: flag(d.code) + ' ' + ct.name, wiki: d.wiki, key: d.id, code: d.code }); };
+    if (m) box.innerHTML = `<button class="btn primary block cta" id="cdOpen">📝 ${t('seeRecipe')}</button>`;
+    else if (cached) showAi(cached);
+    else box.innerHTML = gemKey() ? `<button class="btn primary block cta" id="cdGen">✨ ${t('genRecipe')}</button>` : `<p class="note" style="margin-top:14px">💡 ${t('noRecipeKey')}</p>`;
+    const o = $('#cdOpen', el); if (o) o.onclick = () => m.kind === 'c' ? openCountry(m.id) : openRecipe(m.id);
+    const g = $('#cdGen', el); if (g) g.onclick = async () => {
+      box.innerHTML = `<div class="ai-wait"><div class="ai-orb">✨</div><p>${t('aiWorking')}</p></div>`;
+      try {
+        const prompt = `Write the authentic home recipe for "${d.name}" from ${ct.name}, ${cname(d.code)} (${d.desc}). Write everything in ${LANG_NAME[lang]}. Reply ONLY with JSON: {"name":string,"emoji":string,"cuisine":string,"time_min":number,"servings":number,"difficulty":"easy"|"medium"|"hard","ingredients":[string with amount],"steps":[string],"kcal_per_serving":number,"protein_g":number,"carbs_g":number,"fat_g":number,"fiber_g":number,"tip":string,"serving":string}. Each step = one clear action starting with the verb, include time and the expected consistency. Last step = how it is traditionally served.`;
+        const j = await gemini({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json' } }, 45000);
+        const r = gemJSON(gemText(j)); store.set('cdr:' + d.id, r); showAi(r);
+      } catch (e) { box.innerHTML = `<p class="note">⚠️ ${t('aiErr')}</p>`; }
+    };
+    $('#cdEat', el).onclick = () => { state.tmode = 'trip'; state.trip = d.code; state.results = []; while (stack.length) back(); setTab('travel'); renderTravel(); findRestaurants(); };
+    wikiGet(d.wiki, lang).then(w => { const b = $('#cdWiki', el); if (!b) return; if (!w || !w.extract) { b.remove(); return; } b.innerHTML = `<h3>📖 ${t('about')}</h3><p>${esc(w.extract)}</p><p class="note">Wikipedia · CC BY-SA</p>`; });
+  });
+}
+function aiToRc(r) { return { t: r.time_min || 30, s: r.servings || 4, d: r.difficulty || 'medium', ing: r.ingredients || [], st: r.steps || [], tr: false, ai: true, n: { kcal: Math.round(r.kcal_per_serving || 0), protein: Math.round(r.protein_g || 0), carbs: Math.round(r.carbs_g || 0), fat: Math.round(r.fat_g || 0), fiber: r.fiber_g } }; }
 function countryCard(c, i) {
   return `<div class="ccard" role="button" data-open="c:${c.code}" style="animation-delay:${Math.min(i, 12) * 0.03}s">
     ${photo(c.code, c.wiki, c.emoji)}<span class="flag">${flag(c.code)}</span>${heartBtn('dishes', c.code)}
@@ -400,35 +513,51 @@ function renderPopular() {
 }
 function drawChips() {
   $('#catChips').innerHTML = ['all', 'k', 'a', 's', 't'].map(k => `<button class="chip ${state.cat === k ? 'on' : ''}" data-cat="${k}">${k === 'all' ? t('all') : { k: '☕ ', a: '🍲 ', s: '🥟 ', t: '🍰 ' }[k] + t(k)}</button>`).join('');
+  const SORTS = { az: 'sortAZ', cont: 'sortCont', pop: 'sortPop', kcal: 'sortKcal', time: 'sortTime' };
+  $('#sortChips').innerHTML = `<span class="sort-l">↕ ${t('sortBy')}</span>` + Object.keys(SORTS).map(k => `<button class="chip ${state.sort === k ? 'on' : ''}" data-sort="${k}">${t(SORTS[k])}</button>`).join('');
+  $$('#sortChips .chip').forEach(b => b.onclick = () => { state.sort = b.dataset.sort; store.set('sort', state.sort); drawChips(); drawGrid(); });
   $('#contChips').innerHTML = ['all', ...CONTINENTS].map(k => `<button class="chip ${state.cont === k ? 'on' : ''}" data-cont="${k}">${k === 'all' ? '🌐 ' + t('all') : t(k)}</button>`).join('');
   $$('#catChips .chip').forEach(b => b.onclick = () => { state.cat = b.dataset.cat; drawChips(); drawGrid(); });
   $$('#contChips .chip').forEach(b => b.onclick = () => { state.cont = b.dataset.cont; drawChips(); drawGrid(); });
 }
 function drawGrid() {
-  const list = COUNTRIES.filter(c => (state.cat === 'all' || c.strength === state.cat) && (state.cont === 'all' || c.cont === state.cont))
-    .sort((a, b) => cname(a.code).localeCompare(cname(b.code), lang));
+  const az = (a, b) => cname(a.code).localeCompare(cname(b.code), lang);
+  const cmp = { az, cont: az, pop: (a, b) => popScore(b, 'w') - popScore(a, 'w'), kcal: (a, b) => kcalOf(a.code) - kcalOf(b.code), time: (a, b) => sigOf(a.code).t - sigOf(b.code).t }[state.sort] || az;
+  const list = COUNTRIES.filter(c => (state.cat === 'all' || c.strength === state.cat) && (state.cont === 'all' || c.cont === state.cont)).sort(cmp);
   $('#cCount').textContent = t('countriesN', { n: list.length });
-  $('#cGrid').innerHTML = list.map(countryCard).join('') || `<div class="empty" style="grid-column:1/-1"><span class="e">🍽️</span>${t('noResults')}</div>`;
+  let html;
+  if (state.sort === 'cont') html = CONTINENTS.map(ct => { const g = list.filter(c => c.cont === ct); return g.length ? `<h3 class="grp">${t(ct)} <small>${g.length}</small></h3>` + g.map(countryCard).join('') : ''; }).join('');
+  else html = list.map(countryCard).join('');
+  $('#cGrid').innerHTML = html || `<div class="empty" style="grid-column:1/-1"><span class="e">🍽️</span>${t('noResults')}</div>`;
   hydrate($('#cGrid'));
 }
 const norm = s => String(s).toLocaleLowerCase(lang).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ı/g, 'i');
 function drawSearch() {
   const q = norm(state.q.trim());
-  $('#exHome').classList.toggle('hide', !!q);
+  $('#exHome').classList.toggle('hide', !!q || state.view === 'map');
+  $('#exMap').classList.toggle('hide', !!q || state.view !== 'map');
   const box = $('#exSearch');
-  if (!q) { box.innerHTML = ''; return; }
+  if (!q) { box.innerHTML = ''; if (state.view === 'map') setTimeout(() => WorldMap.resize(), 30); return; }
+  const cts = CITIES.filter(c => [c.name, c.region, cname(c.code)].some(x => norm(x).includes(q)));
+  const cds = CITY_DISHES.filter(d => [d.name, d.wiki, d.desc].some(x => norm(x).includes(q)));
   const cs = COUNTRIES.filter(c => [cname(c.code), c.dish, c.wiki, c.code, c.story, ...(sigOf(c.code).ing)].some(x => norm(x).includes(q)));
   const rs = RECIPES.filter(r => [r.name.tr, r.name.en, r.local, cname(r.country), ...r.ing.tr, ...r.ing.en].some(x => norm(x).includes(q)));
-  box.innerHTML = (rs.length ? `<div class="sec"><h2>${t('recipes')}</h2><small>${rs.length}</small></div><div class="hscroll">${rs.map(recipeCard).join('')}</div>` : '') +
+  box.innerHTML = (cts.length ? `<div class="sec"><h2>🏙️ ${t('cities')}</h2><small>${cts.length}</small></div><div class="city-list">${cts.slice(0, 20).map((c, i) => `<button class="city-card" data-cityid="${c.id}" style="animation-delay:${i * 0.03}s"><span class="f">${flag(c.code)}</span><div><b>${esc(c.name)}</b><small>${esc(c.region)} · ${esc(cname(c.code))}</small></div><span class="n">${c.dishes.length} 🍲</span></button>`).join('')}</div>` : '') +
+    (cds.length ? `<div class="sec"><h2>🍲 ${t('dishes')}</h2><small>${cds.length}</small></div>${cds.slice(0, 20).map((d, i) => `<div class="saved-item" role="button" data-cdid="${d.id}" style="animation-delay:${i * 0.03}s">${photo(d.id, d.wiki, d.emoji)}<div class="b"><h3>${esc(d.name)}</h3><small>${flag(d.code)} ${esc(cityById[d.city].name)} · ${esc(cname(d.code))}</small></div></div>`).join('')}` : '') +
+    (rs.length ? `<div class="sec"><h2>${t('recipes')}</h2><small>${rs.length}</small></div><div class="hscroll">${rs.map(recipeCard).join('')}</div>` : '') +
     (cs.length ? `<div class="sec"><h2>${t('allCountries')}</h2><small>${t('countriesN', { n: cs.length })}</small></div><div class="grid">${cs.map(countryCard).join('')}</div>` : '') +
-    (!cs.length && !rs.length ? `<div class="empty"><span class="e">🔍</span>${t('noResults')}</div>` : '');
+    (!cs.length && !rs.length && !cts.length && !cds.length ? `<div class="empty"><span class="e">🔍</span>${t('noResults')}</div>` : '');
   hydrate(box);
+  $$('[data-cityid]', box).forEach(b => b.onclick = () => { const ct = cityById[b.dataset.cityid]; if (state.view === 'map') { clearQ(); WorldMap.select(ct.code); setTimeout(() => WorldMap.focusCity(ct), 1400); } openCity(ct); });
+  $$('[data-cdid]', box).forEach(b => b.onclick = () => openCityDish(cityDishById[b.dataset.cdid]));
+  if (state.view === 'map') $$('.ccard', box).forEach(b => { b.addEventListener('click', e => { if (e.target.closest('[data-fav]')) return; e.stopImmediatePropagation(); const code = b.dataset.open.split(':')[1]; clearQ(); WorldMap.select(code); }, true); });
 }
+function clearQ() { state.q = ''; const q = $('#exQ'); if (q) q.value = ''; $('#exX') && $('#exX').classList.add('hide'); drawSearch(); }
 // Opening detail pages is handled by ONE global listener (prevents duplicate pages)
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-open]'); if (!b || e.target.closest('[data-fav]')) return;
   const [k, id] = b.dataset.open.split(':');
-  k === 'c' ? openCountry(id) : openRecipe(id);
+  k === 'c' ? openCountry(id) : k === 'd' ? openCityDish(cityDishById[id]) : openRecipe(id);
 });
 
 /* ---------- Recipes: shared helpers ---------- */
@@ -463,7 +592,8 @@ function openKitchen(rc, name, extra) {
   extra = extra || {};
   const w = extra.wiki ? wikiCached(extra.wiki, 'en') : null;
   const local = extra.key && typeof LOCAL_PHOTOS !== 'undefined' && LOCAL_PHOTOS[extra.key];
-  Kitchen.open({ name, country: extra.country || '', emoji: extra.emoji || '🍽️', img: local || (w && (w.big || w.img)) || null, ing: rc.ing, st: rc.st, servings: rc.s, time: fmtTime(rc.t), nutri: rc.n || estimateNutrition(rc.ing, rc.s, rc.key) },
+  const chefId = currentChef(extra.code), ch = CHEFS[chefId];
+  Kitchen.open({ chef: { id: chefId, name: ch.name[lang] || ch.name.tr }, name, country: extra.country || '', emoji: extra.emoji || '🍽️', img: local || (w && (w.big || w.img)) || null, ing: rc.ing, st: rc.st, servings: rc.s, time: fmtTime(rc.t), nutri: rc.n || estimateNutrition(rc.ing, rc.s, rc.key) },
     { t, esc, lang, pushPage, back, keepAwake, openSheet, toast });
 }
 function bindRecipe(el, rc, name, extra) {
@@ -534,7 +664,7 @@ function openCountry(code) {
       ${others.length ? `<div class="sec"><h2>👩‍🍳 ${t('moreRecipes')}</h2><small>${others.length}</small></div><div class="hscroll">${others.map(recipeCard).join('')}</div>` : ''}
       <button class="btn primary block cta" id="goEat">📍 ${t('whereEat')}</button>
     </div>`, el => {
-    if (sig) { sig.key = 'c' + code; bindRecipe(el, sig, dishName(c), { emoji: c.emoji, country: flag(c.code) + ' ' + cname(c.code), wiki: c.wiki, key: c.code }); }
+    if (sig) { sig.key = 'c' + code; bindRecipe(el, sig, dishName(c), { emoji: c.emoji, country: flag(c.code) + ' ' + cname(c.code), wiki: c.wiki, key: c.code, code }); }
     $('#shareBtn', el).onclick = () => sig ? shareRecipe(dishName(c), cname(c.code), sig) : share(dishName(c), c.story);
     $('#goEat', el).onclick = () => { state.tmode = 'near'; state.cuisine = code; state.trip = code; while (stack.length) back(); setTab('travel'); renderTravel(); };
     wikiGet(c.wiki, lang).then(w => {
@@ -563,7 +693,7 @@ function openRecipe(id) {
       ${recipeHTML(rc)}
       <button class="btn ghost block cta" id="goEat">📍 ${t('whereEat')}</button>
     </div>`, el => {
-    rc.key = 'r' + r.id; bindRecipe(el, rc, recName(r), { emoji: r.e, country: flag(r.country) + ' ' + cname(r.country), wiki: r.wiki, key: r.id });
+    rc.key = 'r' + r.id; bindRecipe(el, rc, recName(r), { emoji: r.e, country: flag(r.country) + ' ' + cname(r.country), wiki: r.wiki, key: r.id, code: r.country });
     $('#shareBtn', el).onclick = () => shareRecipe(recName(r), cname(r.country), rc);
     $('#goEat', el).onclick = () => { state.tmode = 'near'; state.cuisine = r.country; state.trip = r.country; while (stack.length) back(); setTab('travel'); renderTravel(); };
   });
@@ -969,7 +1099,7 @@ function renderList() {
   const f = fav();
   const v = $('#v-list');
   v.innerHTML = `<div class="top"><div><div class="hi">🔖 World Bite</div><h1>${t('myList')}</h1></div></div>
-    <div class="seg list-seg" id="lSeg"><span class="knob"></span><button data-m="recipes">🍲 ${t('savedRecipes')} (${f.dishes.length + f.recipes.length})</button><button data-m="rests">🍽️ ${t('savedRest')} (${f.rests.length})</button></div>
+    <div class="seg list-seg" id="lSeg"><span class="knob"></span><button data-m="recipes">🍲 ${t('savedRecipes')} (${f.dishes.length + f.recipes.length + f.cdishes.length})</button><button data-m="rests">🍽️ ${t('savedRest')} (${f.rests.length})</button></div>
     <div id="lBody"></div>`;
   const seg = $('#lSeg');
   $$('button', seg).forEach(b => { b.classList.toggle('on', b.dataset.m === listTab); b.onclick = () => { listTab = b.dataset.m; renderList(); }; });
@@ -977,6 +1107,7 @@ function renderList() {
   const body = $('#lBody');
   if (listTab === 'recipes') {
     const items = [...f.recipes.map(id => recipeById[id] && { type: 'recipes', id, open: 'r:' + id, ph: photo(id, recipeById[id].wiki, recipeById[id].e), name: recName(recipeById[id]), sub: `${flag(recipeById[id].country)} ${cname(recipeById[id].country)} · ${t(recipeById[id].cat)}` }),
+      ...f.cdishes.map(id => { const d = CITY_DISHES.find(x => x.id === id); return d && { type: 'cdishes', id, open: 'd:' + id, ph: photo(d.id, d.wiki, d.emoji), name: d.name, sub: `${flag(d.code)} ${(CITIES.find(c => c.id === d.city) || {}).name} · ${cname(d.code)}` }; }),
       ...f.dishes.map(code => byCode[code] && { type: 'dishes', id: code, open: 'c:' + code, ph: photo(code, byCode[code].wiki, byCode[code].emoji), name: dishName(byCode[code]), sub: `${flag(code)} ${cname(code)} · ${t('signature')}` })].filter(Boolean);
     body.innerHTML = items.length ? items.map((x, i) => `<button class="saved-item" data-open="${x.open}" style="animation-delay:${i * 0.04}s">${x.ph}<div class="b"><h3>${esc(x.name)}</h3><small>${esc(x.sub)}</small></div><span class="rm" data-fav="${x.type}" data-id="${x.id}">${I.heart}</span></button>`).join('')
       : `<div class="empty"><span class="e">🍲</span>${t('emptyRecipes')}</div>`;
@@ -997,6 +1128,10 @@ function renderSettings() {
   const s = session(), color = store.get('color', SWATCHES[0]), dark = store.get('dark', false);
   $('#v-settings').innerHTML = `<div class="top"><div><div class="hi">⚙️ World Bite</div><h1>${t('settings')}</h1></div></div>
     <div class="profile"><div class="avatar">${esc((s.name[0] || '?').toUpperCase())}</div><div><h3>${esc(s.name)}</h3><small>${esc(s.email || '')} · ${t('provider')[s.provider] || ''}</small></div></div>
+    <div class="group"><h4>👩‍🍳 ${t('chefTitle')}</h4>
+      <div class="chef-pick">${Object.values(CHEFS).map(ch => `<button class="chef-card ${currentChef() === ch.id ? 'on' : ''}" data-chef="${ch.id}">${chefSVG(ch.id, currentChef() === ch.id ? 'wink' : 'happy')}<b>${esc(ch.name[lang] || ch.name.tr)}</b><small>${esc(ch.tag[lang] || ch.tag.tr)}</small></button>`).join('')}</div>
+      <div class="chips" style="padding:0 16px 8px;margin:0">${['age', 'dish', 'random'].map(m => `<button class="chip ${store.get('chefMode', 'age') === m ? 'on' : ''}" data-cm="${m}">${t('chef_' + m)}</button>`).join('')}</div>
+      <button class="row" id="sAge"><span class="ri">🎂</span><span class="lbl">${t('age')}</span><small>${s.age || '—'}</small>${I.chev}</button></div>
     <div class="group"><h4>${t('themeColor')}</h4><div class="swatches">${SWATCHES.map(c => `<button class="sw ${c.toLowerCase() === color.toLowerCase() ? 'on' : ''}" data-c="${c}" style="background:${c}"></button>`).join('')}
       <label class="sw customsw ${SWATCHES.map(x => x.toLowerCase()).includes(color.toLowerCase()) ? '' : 'on'}" title="${t('custom')}"><input type="color" id="cc" value="${color}"></label></div>
       <div class="row" id="darkRow"><span class="ri">${I.moon}</span><span class="lbl">${t('darkMode')}</span><span class="toggle ${dark ? 'on' : ''}" style="flex:none"></span></div></div>
@@ -1012,7 +1147,10 @@ function renderSettings() {
       <button class="row" id="sIntro"><span class="ri">${I.replay}</span><span class="lbl">${t('replayIntro')}</span>${I.chev}</button>
       <button class="row" id="sCache"><span class="ri">${I.trash}</span><span class="lbl">${t('clearCache')}</span>${I.chev}</button>
       <button class="row danger" id="sOut"><span class="ri">${I.logout}</span><span class="lbl">${t('logout')}</span></button></div>
-    <div class="group"><h4>${t('about2')}</h4><div class="row"><span class="ri">${I.info}</span><span class="lbl">World Bite</span><small>${t('version')} 1.2.0</small></div><p class="credits">${t('credits')}</p></div>`;
+    <div class="group"><h4>${t('about2')}</h4><div class="row"><span class="ri">${I.info}</span><span class="lbl">World Bite</span><small>${t('version')} 1.3.0</small></div><p class="credits">${t('credits')}</p></div>`;
+  $$('[data-chef]').forEach(b => b.onclick = () => { store.set('chefMode', b.dataset.chef); renderSettings(); });
+  $$('[data-cm]').forEach(b => b.onclick = () => { store.set('chefMode', b.dataset.cm); renderSettings(); });
+  $('#sAge').onclick = () => askAge(true);
   $$('.sw[data-c]').forEach(b => b.onclick = () => { store.set('color', b.dataset.c); applyTheme(); renderSettings(); });
   $('#cc').oninput = e => { store.set('color', e.target.value); applyTheme(); };
   $('#cc').onchange = () => renderSettings();
