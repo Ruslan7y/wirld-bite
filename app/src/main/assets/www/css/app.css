@@ -644,3 +644,54 @@ html.dark .wm-wrap{background:#0F1A26}
 .k-chef{display:flex;align-items:flex-end;gap:8px;margin-bottom:8px;animation:rise .4s ease}
 .k-chef-av svg{width:64px;height:76px;animation:bob 2.8s ease-in-out infinite}
 .k-chef .bubble{flex:1;background:var(--card);border:1px solid var(--line);border-radius:16px 16px 16px 4px;padding:10px 12px;font-size:14px;font-weight:600;margin-bottom:14px}
+
+/* ================= v1.4: picker, portions, diet, shopping ================= */
+.serv{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 10px 8px 14px;margin-top:10px}
+.serv span{flex:1;font-weight:600;font-size:14px}
+.serv button{width:36px;height:36px;border-radius:10px;background:var(--p-soft);color:var(--p);font-size:20px;font-weight:800}
+.serv b{min-width:28px;text-align:center;font-size:18px}
+.ing .it.flash{animation:flash .6s ease}
+@keyframes flash{0%{background:var(--p-soft)}100%{background:transparent}}
+.shop-btn{margin-top:10px;height:46px;font-size:14px}
+.diet-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.dtag{font-size:12px;font-weight:700;padding:5px 10px;border-radius:10px;background:#DCFCE7;color:#166534}
+.dtag.warn{background:#FEE2E2;color:#991B1B}
+html.dark .dtag{background:#14351F;color:#86EFAC}html.dark .dtag.warn{background:#3B1414;color:#FCA5A5}
+.badges .badge.soft:last-child:not(:first-child){padding:3px 6px}
+/* picker */
+.picker{margin-top:10px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:10px;animation:rise .3s ease}
+.pcats{margin:0 -10px 8px;padding:0 10px}
+.pcats .chip{height:32px;font-size:12px}
+.ptiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-height:236px;overflow-y:auto;padding:2px}
+.ptile{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 2px;border-radius:14px;border:2px solid transparent;transition:.2s;animation:pop .3s ease both}
+.ptile .ph{width:54px;height:54px;border-radius:50%}
+.ptile .ph .em{font-size:26px}
+.ptile b{font-size:11px;font-weight:600;text-align:center;line-height:1.2;max-width:100%;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.ptile.in{border-color:var(--p);background:var(--p-soft)}
+.ptile.in .ph::after{content:"✓";position:absolute;inset:0;display:grid;place-items:center;background:color-mix(in srgb,var(--p) 55%,transparent);color:#fff;font-weight:800;font-size:22px;border-radius:50%}
+.ptile.free .ph{background:var(--line)}
+.basket{margin-top:12px;background:var(--p-soft);border-radius:18px;padding:10px 12px}
+.b-head{display:flex;align-items:center;gap:8px}
+.b-head b{flex:1}.b-head small{background:var(--p);color:#fff;border-radius:10px;padding:2px 8px;font-weight:800}
+.b-ic{font-size:24px;display:inline-block}
+.b-ic.bump{animation:bump .4s ease}
+@keyframes bump{40%{transform:scale(1.35) rotate(-8deg)}}
+.link.sm{margin:0;font-size:12px}
+.basket .p-chips{margin-top:8px}
+.fly-ing{position:fixed;left:0;top:0;font-size:30px;z-index:90;pointer-events:none}
+.match{position:relative}
+.mshop{position:absolute;right:10px;bottom:10px;width:36px;height:36px;border-radius:50%;background:var(--p-soft);font-size:17px}
+.mshop.done{background:#DCFCE7}
+/* shopping */
+.shop-cat{font-size:13px;color:var(--muted);margin:16px 2px 6px;display:flex;gap:6px;align-items:center}
+.shop-cat small{background:var(--line);border-radius:8px;padding:1px 7px}
+.shop-item{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:8px;animation:rise .3s ease both;cursor:pointer}
+.shop-item .box{width:22px;height:22px;border-radius:7px;border:2px solid var(--line);flex-shrink:0;display:grid;place-items:center;color:#fff;font-size:13px}
+.shop-item .e{font-size:20px}
+.shop-item .b{flex:1;min-width:0}
+.shop-item .b span{display:block;font-size:14px}
+.shop-item .b small{color:var(--muted);font-size:11px}
+.shop-item .x{width:30px;height:30px;border-radius:50%;color:var(--muted);font-size:18px}
+.shop-item.done{opacity:.55}
+.shop-item.done .b span{text-decoration:line-through}
+.shop-item.done .box{background:var(--p);border-color:var(--p)}

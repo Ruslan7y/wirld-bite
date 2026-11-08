@@ -389,6 +389,7 @@ function renderExplore() {
       <div class="sec"><h2>🌍 ${t('allCountries')}</h2><small id="cCount"></small></div>
       <div class="chips" id="catChips"></div>
       <div class="chips" id="contChips" style="margin-top:8px"></div>
+      <div class="chips" id="dietChips" style="margin-top:8px"></div>
       <div class="chips sort" id="sortChips" style="margin-top:8px"></div>
       <div class="grid" id="cGrid" style="margin-top:14px"></div>
       <p class="note" style="text-align:center;margin-top:18px">${t('demoPop')}</p>
@@ -489,7 +490,7 @@ function aiToRc(r) { return { t: r.time_min || 30, s: r.servings || 4, d: r.diff
 function countryCard(c, i) {
   return `<div class="ccard" role="button" data-open="c:${c.code}" style="animation-delay:${Math.min(i, 12) * 0.03}s">
     ${photo(c.code, c.wiki, c.emoji)}<span class="flag">${flag(c.code)}</span>${heartBtn('dishes', c.code)}
-    <div class="b"><h3>${esc(cname(c.code))}</h3><p>${esc(dishName(c))}</p><div class="badges"><span class="badge">★ ${t(c.strength)}</span><span class="badge soft">🔥 ${kcalOf(c.code)}</span></div></div></div>`;
+    <div class="b"><h3>${esc(cname(c.code))}</h3><p>${esc(dishName(c))}</p><div class="badges"><span class="badge">★ ${t(c.strength)}</span><span class="badge soft">🔥 ${kcalOf(c.code)}</span>${(d => ['veg', 'vegan', 'gf'].filter(k => d[k]).slice(-1).map(k => `<span class="badge soft">${DIET_ICON[k]}</span>`).join(''))(dietTags(sigOf(c.code).ing, 'dc' + c.code))}</div></div></div>`;
 }
 function recipeCard(r, i) {
   return `<button class="rcard" data-open="r:${r.id}" style="animation-delay:${i * 0.04}s">${photo(r.id, r.wiki, r.e)}
@@ -513,6 +514,8 @@ function renderPopular() {
 }
 function drawChips() {
   $('#catChips').innerHTML = ['all', 'k', 'a', 's', 't'].map(k => `<button class="chip ${state.cat === k ? 'on' : ''}" data-cat="${k}">${k === 'all' ? t('all') : { k: '☕ ', a: '🍲 ', s: '🥟 ', t: '🍰 ' }[k] + t(k)}</button>`).join('');
+  $('#dietChips').innerHTML = DIETS.map(k => `<button class="chip ${store.get('diet', []).includes(k) ? 'on' : ''}" data-dk="${k}">${DIET_ICON[k]} ${t('diet_' + k)}</button>`).join('');
+  $$('#dietChips .chip').forEach(b => b.onclick = () => { toggleDiet(b.dataset.dk); drawChips(); drawGrid(); });
   const SORTS = { az: 'sortAZ', cont: 'sortCont', pop: 'sortPop', kcal: 'sortKcal', time: 'sortTime' };
   $('#sortChips').innerHTML = `<span class="sort-l">↕ ${t('sortBy')}</span>` + Object.keys(SORTS).map(k => `<button class="chip ${state.sort === k ? 'on' : ''}" data-sort="${k}">${t(SORTS[k])}</button>`).join('');
   $$('#sortChips .chip').forEach(b => b.onclick = () => { state.sort = b.dataset.sort; store.set('sort', state.sort); drawChips(); drawGrid(); });
@@ -523,7 +526,8 @@ function drawChips() {
 function drawGrid() {
   const az = (a, b) => cname(a.code).localeCompare(cname(b.code), lang);
   const cmp = { az, cont: az, pop: (a, b) => popScore(b, 'w') - popScore(a, 'w'), kcal: (a, b) => kcalOf(a.code) - kcalOf(b.code), time: (a, b) => sigOf(a.code).t - sigOf(b.code).t }[state.sort] || az;
-  const list = COUNTRIES.filter(c => (state.cat === 'all' || c.strength === state.cat) && (state.cont === 'all' || c.cont === state.cont)).sort(cmp);
+  const dp = store.get('diet', []);
+  const list = COUNTRIES.filter(c => (state.cat === 'all' || c.strength === state.cat) && (state.cont === 'all' || c.cont === state.cont) && (!dp.length || (d => dp.every(k => d[k]))(dietTags(sigOf(c.code).ing, 'dc' + c.code)))).sort(cmp);
   $('#cCount').textContent = t('countriesN', { n: list.length });
   let html;
   if (state.sort === 'cont') html = CONTINENTS.map(ct => { const g = list.filter(c => c.cont === ct); return g.length ? `<h3 class="grp">${t(ct)} <small>${g.length}</small></h3>` + g.map(countryCard).join('') : ''; }).join('');
@@ -581,25 +585,64 @@ function nutriHTML(n, ai) {
 }
 function recipeHTML(rc, title) {
   const n = rc.n || estimateNutrition(rc.ing, rc.s, rc.key);
-  return nutriHTML(n, rc.ai) + `<div class="info-row" style="margin-top:14px"><span class="pill p">⏱ ${fmtTime(rc.t)}</span><span class="pill">👥 ${rc.s} ${t('servings')}</span><span class="pill">📊 ${t(rc.d)}</span></div>
+  const dt = dietTags(rc.ing, rc.key ? 'd' + rc.key : null);
+  rc.cur = rc.cur || rc.s;
+  return nutriHTML(n, rc.ai) + dietHTML(dt) + `<div class="info-row" style="margin-top:14px"><span class="pill p">⏱ ${fmtTime(rc.t)}</span><span class="pill">📊 ${t(rc.d)}</span></div>
+    <div class="serv"><span>👥 ${t('servingsFor')}</span><button data-sv="-1" aria-label="-">−</button><b class="svn">${rc.cur}</b><button data-sv="1" aria-label="+">+</button></div>
     ${rc.tr && (lang === 'en' || lang === 'ru') ? `<p class="note">${t('sigLangNote')}</p>` : ''}
     <button class="btn primary block cook-btn" data-cook>👩‍🍳 ${t('startCooking')}</button>
     <div class="prog"><i class="rProg"></i></div>
-    <div class="block"><h3>🧺 ${t('ingredients')} <small class="cnt">${rc.ing.length}</small></h3><ul class="ing">${rc.ing.map(x => `<li><span class="box">✓</span><span>${esc(x)}</span></li>`).join('')}</ul><p class="note">👆 ${t('tapHint')}</p></div>
+    <div class="block"><h3>🧺 ${t('ingredients')} <small class="cnt">${rc.ing.length}</small></h3><ul class="ing">${rc.ing.map(x => `<li><span class="box">✓</span><span class="it">${esc(scaleLine(x, rc.cur / rc.s))}</span></li>`).join('')}</ul><p class="note">👆 ${t('tapHint')}</p>
+      <button class="btn line block shop-btn" data-shop>🛒 ${t('addMissing')}</button></div>
     <div class="block" style="animation-delay:.08s"><h3>🔥 ${t('steps')} <small class="cnt">${rc.st.length}</small></h3><ol class="steps">${rc.st.map((x, i) => `<li><span class="n">${i + 1}</span><span>${esc(x)}</span></li>`).join('')}</ol></div>`;
+}
+function dietHTML(d) {
+  const prefs = store.get('diet', []), ok = DIETS.filter(k => d[k]), bad = prefs.filter(k => !d[k]);
+  if (!ok.length && !bad.length) return '';
+  return `<div class="diet-row">${bad.map(k => `<span class="dtag warn">⚠️ ${t('dietWarn_' + k)}</span>`).join('')}${ok.map(k => `<span class="dtag">${DIET_ICON[k]} ${t('diet_' + k)}</span>`).join('')}</div>`;
 }
 function openKitchen(rc, name, extra) {
   extra = extra || {};
   const w = extra.wiki ? wikiCached(extra.wiki, 'en') : null;
   const local = extra.key && typeof LOCAL_PHOTOS !== 'undefined' && LOCAL_PHOTOS[extra.key];
   const chefId = currentChef(extra.code), ch = CHEFS[chefId];
-  Kitchen.open({ chef: { id: chefId, name: ch.name[lang] || ch.name.tr }, name, country: extra.country || '', emoji: extra.emoji || '🍽️', img: local || (w && (w.big || w.img)) || null, ing: rc.ing, st: rc.st, servings: rc.s, time: fmtTime(rc.t), nutri: rc.n || estimateNutrition(rc.ing, rc.s, rc.key) },
+  Kitchen.open({ chef: { id: chefId, name: ch.name[lang] || ch.name.tr }, name, country: extra.country || '', emoji: extra.emoji || '🍽️', img: local || (w && (w.big || w.img)) || null, ing: rc.ing.map(l => scaleLine(l, (rc.cur || rc.s) / rc.s)), st: rc.st, servings: rc.cur || rc.s, time: fmtTime(rc.t), nutri: rc.n || estimateNutrition(rc.ing, rc.s, rc.key) },
     { t, esc, lang, pushPage, back, keepAwake, openSheet, toast });
 }
 function bindRecipe(el, rc, name, extra) {
   const upd = () => { const all = $$('.ing li,.steps li', el), d = all.filter(x => x.classList.contains('done')); $$('.rProg', el).forEach(p => p.style.width = (d.length / all.length * 100) + '%'); };
   $$('.ing li,.steps li', el).forEach(li => li.onclick = () => { li.classList.toggle('done'); upd(); });
   $$('[data-cook]', el).forEach(b => b.onclick = () => openKitchen(rc, name, extra));
+  const its = $$('.ing li .it', el);
+  const setS = v => { rc.cur = Math.max(1, Math.min(60, v)); const f = rc.cur / rc.s; its.forEach((x, i) => { x.textContent = scaleLine(rc.ing[i], f); x.classList.remove('flash'); void x.offsetWidth; x.classList.add('flash'); }); $$('.svn', el).forEach(x => x.textContent = rc.cur); };
+  $$('[data-sv]', el).forEach(b => b.onclick = () => setS(rc.cur + (+b.dataset.sv)));
+  $$('[data-shop]', el).forEach(b => b.onclick = () => { const n = addToShop(rc.ing.map(l => scaleLine(l, rc.cur / rc.s)), name); toast(n ? t('shopAdded', { n }) : t('shopNone')); });
+}
+/* ---------- shopping list ---------- */
+const shop = () => store.get('shop', []);
+function ingInfo(text) {
+  const low = norm(text); let best = null;
+  for (const it of INGREDIENTS) for (const w of [it.name.tr, it.name[lang], it.name.en, ...it.words]) { const nw = norm(w); if (nw.length >= 2 && low.includes(nw) && (!best || nw.length > best.len)) best = { it, len: nw.length }; }
+  return best ? best.it : null;
+}
+function pantryStems(items) {
+  const out = [];
+  (items || pantry()).forEach(x => {
+    if (x[0] === '#') { const it = ING_BY_ID[x.slice(1)]; if (it) [it.name.tr, ...it.words].forEach(w => out.push(stemOf(w))); }
+    else out.push(stemOf(x));
+  });
+  return out.filter(Boolean);
+}
+function addToShop(lines, src) {
+  const have = pantryStems(), list = shop(); let n = 0;
+  for (const p of needParts(lines)) {
+    const key = norm(shortIng(p)); if (!key) continue;
+    if (have.some(st => norm(p).includes(st))) continue;
+    if (list.some(x => !x.done && norm(shortIng(x.text)) === key)) continue;
+    const info = ingInfo(p);
+    list.push({ id: 's' + Date.now().toString(36) + n, text: p.replace(/^[^:]{2,22}:\s*/, ''), cat: info ? info.cat : 'other', emoji: info ? info.emoji : ingEmoji(p), src: src || '', done: false }); n++;
+  }
+  store.set('shop', list); return n;
 }
 function fmtTime(m) {
   if (m >= 1440) return Math.round(m / 1440) + ' ' + t('days');
@@ -1006,71 +1049,120 @@ function allRecipes() {
 }
 const stemOf = w => { w = norm(EN2TR[norm(w)] || w); return w.length <= 3 ? w : w.slice(0, Math.max(4, w.length - 2)); };
 function matchRecipes(items) {
-  const stems = items.map(stemOf).filter(Boolean);
+  const stems = pantryStems(items), prefs = store.get('diet', []);
   if (!stems.length) return [];
   return allRecipes().map(r => {
     const need = needParts(r.ing);
     if (!need.length) return null;
     const have = need.filter(l => stems.some(s => norm(l).includes(s)));
     const score = have.length / need.length;
-    const n = estimateNutrition(r.ing, r.s, r.kind + r.id);
-    return { r, score, have: have.length, need: need.length, missing: need.filter(l => !have.includes(l)).map(shortIng), n };
+    const n = estimateNutrition(r.ing, r.s, r.kind + r.id), dt = dietTags(r.ing, 'd' + r.kind + r.id);
+    if (prefs.some(k => !dt[k])) return null;
+    return { r, dt, score, have: have.length, need: need.length, missing: need.filter(l => !have.includes(l)).map(shortIng), n };
   }).filter(x => x && x.have > 0)
     .filter(x => (!pantryFilter.quick || x.r.t <= 30) && (!pantryFilter.easy || x.r.d === 'easy') && (!pantryFilter.light || x.n.kcal <= 500))
     .sort((a, b) => b.score - a.score || b.have - a.have || a.r.t - b.r.t).slice(0, 20);
 }
 function shortIng(l) { return l.replace(/^[^:]{0,22}:\s*/, '').replace(/\(.*?\)/g, '').replace(/^[\d½¼¾⅓⅔.,\-–\s]+(kg|g|gr|ml|litre|l|su bardağı|yemek kaşığı|tatlı kaşığı|çay kaşığı|paket|demet|diş|baş|dilim|kutu|tutam|avuç|adet|kase)?(?=\s|$)\s*/i, '').trim().slice(0, 28); }
 
+let pickCat = 'veg';
+const ingLabel = x => { if (x[0] === '#') { const it = ING_BY_ID[x.slice(1)]; return it ? (it.name[lang] || it.name.tr) : x; } return x; };
+const ingIcon = x => { if (x[0] === '#') { const it = ING_BY_ID[x.slice(1)]; return it ? it.emoji : '🥄'; } const i = ingInfo(x); return i ? i.emoji : ingEmoji(x); };
 function renderPantry() {
-  const items = pantry(), qa = (QUICK_ADD[lang] || QUICK_ADD[lang === 'az' ? 'tr' : 'en'] || QUICK_ADD.tr).filter(x => !items.includes(x));
-  const ai = store.get('aiRecipes', []);
+  const items = pantry(), ai = store.get('aiRecipes', []);
   $('#v-pantry').innerHTML = `
     <div class="top"><div><div class="hi">🧺 World Bite</div><h1>${t('pantryTitle')}</h1></div></div>
     <p class="hint">${t('pantryHint')}</p>
     <div class="trow"><label class="search">${I.search}<input id="pIn" placeholder="${t('addIng')}" autocomplete="off"></label><button class="icon-btn" id="pAdd">＋</button></div>
-    <div class="p-chips">${items.map((x, i) => `<span class="p-chip">${ingEmoji(EN2TR[norm(x)] || x)} ${esc(x)}<button data-rm="${i}">×</button></span>`).join('') || `<span class="note">${t('pantryEmpty')}</span>`}</div>
-    <div class="chips" style="margin-top:10px">${qa.slice(0, 14).map(x => `<button class="chip" data-qa="${esc(x)}">＋ ${ingEmoji(EN2TR[x] || x)} ${esc(x)}</button>`).join('')}</div>
+    <div class="picker" id="pPick"></div>
+    <div class="basket" id="pBasket"><div class="b-head"><span class="b-ic" id="pBasketIc">🧺</span><b>${t('basket')}</b><small>${items.length}</small>${items.length ? `<button class="link sm" id="pClear">${t('clearAll')}</button>` : ''}</div>
+      <div class="p-chips" id="pChips"></div></div>
     <div class="chips" style="margin-top:12px">
       <button class="chip ${pantryFilter.quick ? 'on' : ''}" data-pf="quick">⚡ ${t('quick')}</button>
       <button class="chip ${pantryFilter.easy ? 'on' : ''}" data-pf="easy">🙂 ${t('easyF')}</button>
-      <button class="chip ${pantryFilter.light ? 'on' : ''}" data-pf="light">🥗 ${t('light')}</button></div>
+      <button class="chip ${pantryFilter.light ? 'on' : ''}" data-pf="light">🥗 ${t('light')}</button>
+      ${DIETS.map(k => `<button class="chip ${store.get('diet', []).includes(k) ? 'on' : ''}" data-pd="${k}">${DIET_ICON[k]} ${t('diet_' + k)}</button>`).join('')}</div>
     <div class="btn-row"><button class="btn primary" id="pFind" ${items.length ? '' : 'disabled'}>🔍 ${t('whatCook')}</button>
       <button class="btn ghost" id="pAI" ${items.length ? '' : 'disabled'}>✨ ${t('aiCook')}</button></div>
     ${!gemKey() ? `<p class="hint small">💡 ${t('aiNeedKey')}</p>` : ''}
     <div id="pRes"></div>
     ${ai.length ? `<div class="sec"><h2>✨ ${t('recentAi')}</h2><small>${ai.length}</small></div><div id="pAiList">${ai.map((r, i) => aiRow(r, i)).join('')}</div>` : ''}`;
+  drawChipsP(); drawPicker('');
   const input = $('#pIn');
-  const add = v => { v = v.trim().toLocaleLowerCase(lang); if (!v) return; const p = pantry(); v.split(/[,;]+/).map(x => x.trim()).filter(Boolean).forEach(x => { if (!p.includes(x)) p.push(x); }); store.set('pantry', p); pantryResults = null; renderPantry(); setTimeout(() => $('#pIn') && $('#pIn').focus(), 30); };
-  input.onkeydown = e => { if (e.key === 'Enter') add(input.value); };
-  $('#pAdd').onclick = () => add(input.value);
-  $$('[data-rm]', $('#v-pantry')).forEach(b => b.onclick = () => { const p = pantry(); p.splice(+b.dataset.rm, 1); store.set('pantry', p); pantryResults = null; renderPantry(); });
-  $$('[data-qa]').forEach(b => b.onclick = () => add(b.dataset.qa));
+  input.oninput = () => drawPicker(input.value);
+  input.onkeydown = e => { if (e.key === 'Enter') { const q = input.value.trim(); if (!q) return; const hit = searchIng(q)[0]; addPantry(hit && norm(hit.name[lang] || hit.name.tr) === norm(q) ? '#' + hit.id : q, null); input.value = ''; drawPicker(''); } };
+  $('#pAdd').onclick = () => { const q = input.value.trim(); if (q) { addPantry(q, null); input.value = ''; drawPicker(''); } else input.focus(); };
+  const cl = $('#pClear'); if (cl) cl.onclick = () => { store.set('pantry', []); pantryResults = null; renderPantry(); };
   $$('[data-pf]').forEach(b => b.onclick = () => { pantryFilter[b.dataset.pf] = !pantryFilter[b.dataset.pf]; store.set('pantryFilter', pantryFilter); if (pantryResults) pantryResults = matchRecipes(pantry()); renderPantry(); });
+  $$('[data-pd]').forEach(b => b.onclick = () => { toggleDiet(b.dataset.pd); if (pantryResults) pantryResults = matchRecipes(pantry()); renderPantry(); });
   $('#pFind').onclick = () => { pantryResults = matchRecipes(pantry()); renderPantry(); setTimeout(() => $('#pRes') && $('#pRes').scrollIntoView({ behavior: 'smooth', block: 'start' }), 60); };
   $('#pAI').onclick = () => gemKey() ? aiRecipe() : (setTab('settings'), toast(t('aiNeedKey')));
   $$('[data-ai]').forEach(b => b.onclick = e => { if (e.target.closest('[data-airm]')) { const a = store.get('aiRecipes', []); a.splice(+e.target.closest('[data-airm]').dataset.airm, 1); store.set('aiRecipes', a); renderPantry(); return; } openAiRecipe(store.get('aiRecipes', [])[+b.dataset.ai]); });
   if (pantryResults) {
     $('#pRes').innerHTML = pantryResults.length ? `<div class="sec"><h2>🍳 ${t('canCook')}</h2><small>${pantryResults.length}</small></div>` + pantryResults.map((x, i) => `
-      <div class="match" role="button" data-open="${x.r.kind}:${x.r.id}" style="animation-delay:${i * 0.03}s">${photo(x.r.kind === 'c' ? x.r.id : x.r.id, x.r.wiki, x.r.emoji)}
-        <div class="b"><small>${flag(x.r.country)} ${esc(cname(x.r.country))}</small><h3>${esc(x.r.name)}</h3>
+      <div class="match" role="button" data-open="${x.r.kind}:${x.r.id}" style="animation-delay:${i * 0.03}s">${photo(x.r.id, x.r.wiki, x.r.emoji)}
+        <div class="b"><small>${flag(x.r.country)} ${esc(cname(x.r.country))} ${DIETS.filter(k => x.dt[k]).map(k => DIET_ICON[k]).join('')}</small><h3>${esc(x.r.name)}</h3>
           <div class="mbar"><i style="width:${Math.round(x.score * 100)}%"></i></div>
           <small><b>${t('match', { p: Math.round(x.score * 100) })}</b> · ⏱ ${fmtTime(x.r.t)} · 🔥 ${x.n.kcal} kcal</small>
-          ${x.missing.length ? `<small class="miss">${t('missing')}: ${esc(x.missing.slice(0, 4).join(', '))}${x.missing.length > 4 ? '…' : ''}</small>` : `<small class="okk">✓ ${t('haveAll')}</small>`}</div></div>`).join('')
+          ${x.missing.length ? `<small class="miss">${t('missing')}: ${esc(x.missing.slice(0, 4).join(', '))}${x.missing.length > 4 ? '…' : ''}</small>` : `<small class="okk">✓ ${t('haveAll')}</small>`}</div>
+        ${x.missing.length ? `<button class="mshop" data-shopi="${i}" aria-label="shop">🛒</button>` : ''}</div>`).join('')
       : `<div class="empty"><span class="e">🤔</span>${t('noMatch')}</div>`;
     hydrate($('#pRes'));
+    $$('[data-shopi]', $('#pRes')).forEach(b => b.addEventListener('click', e => { e.stopPropagation(); const x = pantryResults[+b.dataset.shopi]; const n = addToShop(x.r.ing, x.r.name); toast(n ? t('shopAdded', { n }) : t('shopNone')); b.classList.add('done'); }, true));
   }
 }
+function searchIng(q) {
+  const nq = norm(q); if (!nq) return [];
+  return INGREDIENTS.map(it => { const names = [it.name[lang], it.name.tr, it.name.en, it.name.az, it.name.ru, ...it.words].map(norm); const st = names.some(n => n.startsWith(nq)) ? 2 : names.some(n => n.includes(nq)) ? 1 : 0; return { it, st }; })
+    .filter(x => x.st).sort((a, b) => b.st - a.st).map(x => x.it).slice(0, 18);
+}
+function drawPicker(q) {
+  const box = $('#pPick'); if (!box) return;
+  const have = new Set(pantry());
+  const tile = it => `<button class="ptile ${have.has('#' + it.id) ? 'in' : ''}" data-ing="${it.id}">${photo('ing-' + it.id, it.wiki, it.emoji)}<b>${esc(it.name[lang] || it.name.tr)}</b></button>`;
+  if (q.trim()) {
+    const res = searchIng(q);
+    box.innerHTML = `<div class="ptiles">${res.map(tile).join('')}<button class="ptile free" data-free="1"><div class="ph"><span class="em">＋</span></div><b>${esc(t('addFree', { q: q.trim() }))}</b></button></div>`;
+  } else {
+    box.innerHTML = `<div class="chips pcats">${ING_CATS.map(c => `<button class="chip ${pickCat === c ? 'on' : ''}" data-pc="${c}">${ING_CAT_ICON[c]} ${t('cat_' + c)}</button>`).join('')}</div>
+      <div class="ptiles">${INGREDIENTS.filter(i => i.cat === pickCat).map(tile).join('')}</div>`;
+    $$('[data-pc]', box).forEach(b => b.onclick = () => { pickCat = b.dataset.pc; drawPicker(''); });
+  }
+  hydrate(box);
+  $$('[data-ing]', box).forEach(b => b.onclick = () => { const id = '#' + b.dataset.ing; if (pantry().includes(id)) { removePantry(id); b.classList.remove('in'); } else { addPantry(id, b); b.classList.add('in'); } });
+  const fr = $('[data-free]', box); if (fr) fr.onclick = () => { addPantry(q.trim(), fr); $('#pIn').value = ''; drawPicker(''); };
+}
+function flyToBasket(from, icon) {
+  const to = $('#pBasketIc'); if (!from || !to) return;
+  const a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
+  const f = document.createElement('div'); f.className = 'fly-ing'; f.textContent = icon; document.body.appendChild(f);
+  f.animate([{ transform: `translate(${a.left + a.width / 2 - 16}px,${a.top + a.height / 2 - 16}px) scale(1.4)` }, { transform: `translate(${(a.left + b.left) / 2}px,${Math.min(a.top, b.top) - 60}px) scale(1.2)`, offset: .5 }, { transform: `translate(${b.left + b.width / 2 - 16}px,${b.top + b.height / 2 - 16}px) scale(.5)`, opacity: .4 }], { duration: 650, easing: 'cubic-bezier(.3,.7,.4,1)' }).onfinish = () => { f.remove(); to.classList.remove('bump'); void to.offsetWidth; to.classList.add('bump'); };
+}
+function addPantry(x, fromEl) {
+  const p = pantry(); if (!x || p.includes(x)) return;
+  p.push(x); store.set('pantry', p); pantryResults = null;
+  flyToBasket(fromEl, ingIcon(x)); setTimeout(drawChipsP, fromEl ? 600 : 0);
+  ['pFind', 'pAI'].forEach(id => { const b = $('#' + id); if (b) b.disabled = false; });
+}
+function removePantry(x) { const p = pantry().filter(y => y !== x); store.set('pantry', p); pantryResults = null; drawChipsP(); }
+function drawChipsP() {
+  const box = $('#pChips'); if (!box) return; const items = pantry();
+  box.innerHTML = items.map((x, i) => `<span class="p-chip">${ingIcon(x)} ${esc(ingLabel(x))}<button data-rm="${i}">×</button></span>`).join('') || `<span class="note">${t('pantryEmpty')}</span>`;
+  const cnt = $('#pBasket small'); if (cnt) cnt.textContent = items.length;
+  $$('[data-rm]', box).forEach(b => b.onclick = () => { removePantry(pantry()[+b.dataset.rm]); drawPicker($('#pIn') ? $('#pIn').value : ''); });
+}
+function toggleDiet(k) { const d = store.get('diet', []); const i = d.indexOf(k); i < 0 ? d.push(k) : d.splice(i, 1); store.set('diet', d); }
 function aiRow(r, i) { return `<div class="saved-item" role="button" data-ai="${i}"><div class="ph" style="border-radius:14px"><span class="em">${r.emoji || '🍽️'}</span></div><div class="b"><h3>${esc(r.name)}</h3><small>⏱ ${r.time_min || '?'} ${t('min')} · 🔥 ${r.kcal_per_serving || '?'} kcal · ${esc((r.have || []).slice(0, 3).join(', '))}</small></div><button class="rm" data-airm="${i}">${I.trash}</button></div>`; }
 async function aiRecipe() {
   const items = pantry();
   $('#pRes').innerHTML = `<div class="ai-wait"><div class="ai-orb">✨</div><p>${t('aiWorking')}</p></div>`;
   $('#pRes').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  const prompt = `I have these ingredients: ${items.join(', ')}. Suggest ONE quick, tasty, realistic home recipe that uses mainly these (basic pantry items like salt, pepper, oil, water and common spices are allowed; avoid other extras or mark them optional).${pantryFilter.quick ? ' It must take at most 30 minutes.' : ''}${pantryFilter.light ? ' Keep it under 500 kcal per serving.' : ''}
+  const prompt = `I have these ingredients: ${items.map(ingLabel).join(', ')}.${store.get('diet', []).length ? ' Diet requirements: ' + store.get('diet', []).map(k => I18N.en['diet_' + k]).join(', ') + '.' : ''} Suggest ONE quick, tasty, realistic home recipe that uses mainly these (basic pantry items like salt, pepper, oil, water and common spices are allowed; avoid other extras or mark them optional).${pantryFilter.quick ? ' It must take at most 30 minutes.' : ''}${pantryFilter.light ? ' Keep it under 500 kcal per serving.' : ''}
 Write everything in ${LANG_NAME[lang]}. Reply ONLY with JSON: {"name":string,"emoji":string,"cuisine":string,"time_min":number,"servings":number,"difficulty":"easy"|"medium"|"hard","ingredients":[string with amount],"steps":[string],"kcal_per_serving":number,"protein_g":number,"carbs_g":number,"fat_g":number,"fiber_g":number,"tip":string,"serving":string}.
 Each step = one clear action starting with the verb (e.g. crack, whisk, chop, fry, boil, bake, rest, garnish, serve), include the time (e.g. "5 min") and the expected consistency/look. Last step = how to plate and serve it.`;
   try {
     const j = await gemini({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json' } }, 45000);
-    const r = gemJSON(gemText(j)); r.have = items.slice(); r.ts = Date.now();
+    const r = gemJSON(gemText(j)); r.have = items.map(ingLabel); r.ts = Date.now();
     const a = store.get('aiRecipes', []); a.unshift(r); store.set('aiRecipes', a.slice(0, 20));
     renderPantry(); openAiRecipe(r);
   } catch (e) { $('#pRes').innerHTML = `<div class="empty"><span class="e">⚠️</span>${t('aiErr')}<br><small>${esc(String(e.message || e).slice(0, 140))}</small></div>`; }
@@ -1099,7 +1191,7 @@ function renderList() {
   const f = fav();
   const v = $('#v-list');
   v.innerHTML = `<div class="top"><div><div class="hi">🔖 World Bite</div><h1>${t('myList')}</h1></div></div>
-    <div class="seg list-seg" id="lSeg"><span class="knob"></span><button data-m="recipes">🍲 ${t('savedRecipes')} (${f.dishes.length + f.recipes.length + f.cdishes.length})</button><button data-m="rests">🍽️ ${t('savedRest')} (${f.rests.length})</button></div>
+    <div class="seg list-seg" id="lSeg"><span class="knob"></span><button data-m="recipes">🍲 ${t('recipes')} ${f.dishes.length + f.recipes.length + f.cdishes.length}</button><button data-m="rests">🍽️ ${t('savedRest')} ${f.rests.length}</button><button data-m="shop">🛒 ${t('shopping')} ${shop().filter(x => !x.done).length}</button></div>
     <div id="lBody"></div>`;
   const seg = $('#lSeg');
   $$('button', seg).forEach(b => { b.classList.toggle('on', b.dataset.m === listTab); b.onclick = () => { listTab = b.dataset.m; renderList(); }; });
@@ -1112,6 +1204,8 @@ function renderList() {
     body.innerHTML = items.length ? items.map((x, i) => `<button class="saved-item" data-open="${x.open}" style="animation-delay:${i * 0.04}s">${x.ph}<div class="b"><h3>${esc(x.name)}</h3><small>${esc(x.sub)}</small></div><span class="rm" data-fav="${x.type}" data-id="${x.id}">${I.heart}</span></button>`).join('')
       : `<div class="empty"><span class="e">🍲</span>${t('emptyRecipes')}</div>`;
     hydrate(body);
+  } else if (listTab === 'shop') {
+    renderShop(body);
   } else {
     body.innerHTML = f.rests.length ? f.rests.map((r, i) => `<div class="saved-item" data-r="${r.id}" style="animation-delay:${i * 0.04}s"><div class="ph" style="border-radius:14px"><span class="em">🍽️</span></div><div class="b"><h3>${esc(r.name)}</h3><small>${esc(r.cuisine.join(', ') || r.addr || '')}</small></div><button class="rm" data-rm="${r.id}">${I.heart}</button></div>`).join('')
       : `<div class="empty"><span class="e">🍽️</span>${t('emptyRest')}</div>`;
@@ -1123,6 +1217,24 @@ function renderList() {
   }
 }
 
+function renderShop(body) {
+  const list = shop();
+  body.innerHTML = `<div class="trow"><label class="search">${I.search}<input id="shIn" placeholder="${t('shopAddPh')}" autocomplete="off"></label><button class="icon-btn" id="shAdd">＋</button></div>
+    ${list.length ? `<div class="btn-row"><button class="btn line" id="shShare">📤 ${t('shareList')}</button><button class="btn line" id="shClear">✓ ${t('clearDone')}</button></div>` : ''}
+    <div id="shList">${list.length ? ING_CATS.map(c => { const g = list.filter(x => x.cat === c); return g.length ? `<h4 class="shop-cat">${ING_CAT_ICON[c]} ${t('cat_' + c)} <small>${g.filter(x => !x.done).length}</small></h4>` + g.map(x => `<div class="shop-item ${x.done ? 'done' : ''}" data-sid="${x.id}"><span class="box">✓</span><span class="e">${x.emoji}</span><div class="b"><span>${esc(x.text)}</span>${x.src ? `<small>${esc(x.src)}</small>` : ''}</div><button class="x" data-sdel="${x.id}">×</button></div>`).join('') : ''; }).join('')
+      : `<div class="empty"><span class="e">🛒</span>${t('shopEmpty')}</div>`}</div>`;
+  const add = () => { const v = $('#shIn').value.trim(); if (!v) return; const info = ingInfo(v); const l = shop(); l.push({ id: 's' + Date.now().toString(36), text: v, cat: info ? info.cat : 'other', emoji: info ? info.emoji : ingEmoji(v), src: '', done: false }); store.set('shop', l); renderList(); setTimeout(() => $('#shIn') && $('#shIn').focus(), 30); };
+  $('#shAdd').onclick = add; $('#shIn').onkeydown = e => { if (e.key === 'Enter') add(); };
+  $('#shList').onclick = e => {
+    const del = e.target.closest('[data-sdel]'); const l = shop();
+    if (del) { store.set('shop', l.filter(x => x.id !== del.dataset.sdel)); renderList(); return; }
+    const it = e.target.closest('[data-sid]'); if (!it) return;
+    const x = l.find(y => y.id === it.dataset.sid); x.done = !x.done; store.set('shop', l); it.classList.toggle('done', x.done);
+  };
+  const sc = $('#shClear'); if (sc) sc.onclick = () => { store.set('shop', shop().filter(x => !x.done)); renderList(); };
+  const ss = $('#shShare'); if (ss) ss.onclick = () => share('🛒 ' + t('shopping'), shop().filter(x => !x.done).map(x => `☐ ${x.text}`).join('\n'));
+}
+
 /* ---------- SETTINGS ---------- */
 function renderSettings() {
   const s = session(), color = store.get('color', SWATCHES[0]), dark = store.get('dark', false);
@@ -1132,6 +1244,7 @@ function renderSettings() {
       <div class="chef-pick">${Object.values(CHEFS).map(ch => `<button class="chef-card ${currentChef() === ch.id ? 'on' : ''}" data-chef="${ch.id}">${chefSVG(ch.id, currentChef() === ch.id ? 'wink' : 'happy')}<b>${esc(ch.name[lang] || ch.name.tr)}</b><small>${esc(ch.tag[lang] || ch.tag.tr)}</small></button>`).join('')}</div>
       <div class="chips" style="padding:0 16px 8px;margin:0">${['age', 'dish', 'random'].map(m => `<button class="chip ${store.get('chefMode', 'age') === m ? 'on' : ''}" data-cm="${m}">${t('chef_' + m)}</button>`).join('')}</div>
       <button class="row" id="sAge"><span class="ri">🎂</span><span class="lbl">${t('age')}</span><small>${s.age || '—'}</small>${I.chev}</button></div>
+    <div class="group"><h4>🥗 ${t('dietTitle')}</h4><div class="chips" style="padding:6px 16px 4px;margin:0;flex-wrap:wrap">${DIETS.map(k => `<button class="chip ${store.get('diet', []).includes(k) ? 'on' : ''}" data-sd="${k}">${DIET_ICON[k]} ${t('diet_' + k)}</button>`).join('')}</div><p class="credits" style="padding-top:8px">${t('dietNote')}</p></div>
     <div class="group"><h4>${t('themeColor')}</h4><div class="swatches">${SWATCHES.map(c => `<button class="sw ${c.toLowerCase() === color.toLowerCase() ? 'on' : ''}" data-c="${c}" style="background:${c}"></button>`).join('')}
       <label class="sw customsw ${SWATCHES.map(x => x.toLowerCase()).includes(color.toLowerCase()) ? '' : 'on'}" title="${t('custom')}"><input type="color" id="cc" value="${color}"></label></div>
       <div class="row" id="darkRow"><span class="ri">${I.moon}</span><span class="lbl">${t('darkMode')}</span><span class="toggle ${dark ? 'on' : ''}" style="flex:none"></span></div></div>
@@ -1147,10 +1260,11 @@ function renderSettings() {
       <button class="row" id="sIntro"><span class="ri">${I.replay}</span><span class="lbl">${t('replayIntro')}</span>${I.chev}</button>
       <button class="row" id="sCache"><span class="ri">${I.trash}</span><span class="lbl">${t('clearCache')}</span>${I.chev}</button>
       <button class="row danger" id="sOut"><span class="ri">${I.logout}</span><span class="lbl">${t('logout')}</span></button></div>
-    <div class="group"><h4>${t('about2')}</h4><div class="row"><span class="ri">${I.info}</span><span class="lbl">World Bite</span><small>${t('version')} 1.3.0</small></div><p class="credits">${t('credits')}</p></div>`;
+    <div class="group"><h4>${t('about2')}</h4><div class="row"><span class="ri">${I.info}</span><span class="lbl">World Bite</span><small>${t('version')} 1.4.0</small></div><p class="credits">${t('credits')}</p></div>`;
   $$('[data-chef]').forEach(b => b.onclick = () => { store.set('chefMode', b.dataset.chef); renderSettings(); });
   $$('[data-cm]').forEach(b => b.onclick = () => { store.set('chefMode', b.dataset.cm); renderSettings(); });
   $('#sAge').onclick = () => askAge(true);
+  $$('[data-sd]').forEach(b => b.onclick = () => { toggleDiet(b.dataset.sd); b.classList.toggle('on'); drawChips && $('#dietChips') && (drawChips(), drawGrid()); });
   $$('.sw[data-c]').forEach(b => b.onclick = () => { store.set('color', b.dataset.c); applyTheme(); renderSettings(); });
   $('#cc').oninput = e => { store.set('color', e.target.value); applyTheme(); };
   $('#cc').onchange = () => renderSettings();

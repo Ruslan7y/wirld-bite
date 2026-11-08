@@ -20,7 +20,9 @@
 | Ülke sayfası | İmza yemek, fotoğraf, güçlü olduğu alan (kahvaltı / ana yemek / ara sıcak / tatlı), hikaye, açıklama |
 | Seyahat | Önce konum izni; yakındaki restoranlar uygulama içinde liste + vektör harita (MapLibre/OpenFreeMap). Gemini anahtarı varsa Google Haritalar puan ve yorumlarıyla. Tüm aramalar telefonda saklanır |
 | Mutfak animasyonu | Her tarif için: malzemeler kaba uçar ve listeden çıkar, yumurta kırma, çırpma, doğrama, kızartma, kaynatma, fırın; kıvam bilgisi, süre ve zamanlayıcı, atla, servis sunumu, kamerada "masada gör" |
-| Elimdekiler | Eldeki malzemelerle yapılabilecek tarifler (% eşleşme, eksikler) + Gemini ile özel tarif |
+| Elimdekiler | Görselli malzeme seçici (160 ürün, 7 kategori, 4 dil, yazınca öneri), eşleşen tarifler (% eşleşme, eksikler) + Gemini ile özel tarif |
+| Porsiyon & alışveriş | Kişi sayısına göre miktarlar yeniden hesaplanır; eksikler tek dokunuşla Listem → Alışveriş'e, kategorilere göre |
+| Beslenme filtreleri | Vejetaryen, vegan, glütensiz, helal uyumlu, laktozsuz — malzemelerden otomatik etiket, uyarılar |
 | Besin değerleri | Tüm yemeklerde porsiyon başına kcal, protein, karbonhidrat, yağ (malzemelerden tahmini) |
 | Listem | Kaydedilen tarifler/yemekler ve restoranlar ayrı ayrı |
 | Ayarlar | Tema rengi (8 hazır + özel renk), koyu mod, dil (TR / AZ / EN / RU), çıkış |
