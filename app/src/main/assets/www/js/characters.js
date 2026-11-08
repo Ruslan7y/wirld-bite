@@ -55,3 +55,47 @@ function chefFor(mode, age, countryCode, cont, seed) {
   const a = +age || 30;
   return a < 30 ? 'aylin' : a < 55 ? 'zeynep' : 'leyla';
 }
+
+/* What the chef says during the game. Several options per key → picked at random. */
+const CHEF_LINES = {
+  tr: {
+    drag: ['Gerekli malzemeleri kaba sürükle!', 'Hadi, malzemeleri tek tek kaba at!'], wrong: ['Bu bu adımda lazım değil 🙂', 'Hımm, o sonra gelecek!'],
+    crack: ['Yumurtayı tam zamanında kır! Yeşilde dokun.'], whisk: ['Parmağınla hızlı hızlı daire çiz!', 'Çırp, çırp, çırp!'], mix: ['Yavaşça daire çizerek karıştır.'],
+    chop: ['Aşağı kaydır ya da dokun: doğra! Ritmini koru.'], knead: ['Sağa sola sürükleyerek yoğur!'], roll: ['Oklavayı sağa sola gezdir!'],
+    heat: ['Ateşi yeşil bölgede tut! Yukarı-aşağı kaydır.'], tooHot: ['Ateş çok yüksek, yanıyor!', 'Aman, kısık ateş!'], tooLow: ['Biraz daha ısıt!'],
+    flip: ['Şimdi yukarı kaydır, çevir!'], oven: ['Fırını {c}°C\'ye ayarla, kadranı çevir!'], rest: ['Sabır… Saate dokun, zamanı hızlandıralım.'],
+    layer: ['Her dokunuşta bir kat ekle!'], wrap: ['Dokun, sar ve kapat!'], garnish: ['Tabağa dokunarak süsle!'],
+    great: ['Harika!', 'Mükemmel kıvam!', 'Usta işi!'], good: ['Güzel oldu!', 'Aferin!'], ok: ['Olsun, devam!', 'Bir dahakine daha iyi!'], done: ['Ellerine sağlık! Afiyet olsun!']
+  },
+  az: {
+    drag: ['Lazım olan ərzaqları qaba sürüşdür!'], wrong: ['Bu bu addımda lazım deyil 🙂'], crack: ['Yumurtanı vaxtında sındır! Yaşılda toxun.'],
+    whisk: ['Barmağınla tez-tez dairə çək!'], mix: ['Yavaş-yavaş dairə çəkərək qarışdır.'], chop: ['Aşağı sürüşdür və ya toxun: doğra!'], knead: ['Sağa-sola sürüşdürərək yoğur!'],
+    roll: ['Oxlovu sağa-sola gəzdir!'], heat: ['Odu yaşıl zonada saxla!'], tooHot: ['Od çox yüksəkdir, yanır!'], tooLow: ['Bir az da qızdır!'], flip: ['İndi yuxarı sürüşdür, çevir!'],
+    oven: ['Sobanı {c}°C-yə qur!'], rest: ['Səbr… Saata toxun, vaxtı sürətləndirək.'], layer: ['Hər toxunuşda bir qat əlavə et!'], wrap: ['Toxun, bük və bağla!'], garnish: ['Boşqaba toxunaraq bəzə!'],
+    great: ['Əla!', 'Mükəmməl qıvam!'], good: ['Gözəl oldu!', 'Afərin!'], ok: ['Olsun, davam!'], done: ['Əllərinə sağlıq! Nuş olsun!']
+  },
+  en: {
+    drag: ['Drag the right ingredients into the bowl!', 'Pop the ingredients in one by one!'], wrong: ["That's not needed in this step 🙂", 'Hmm, that comes later!'],
+    crack: ['Crack the egg right on time — tap in the green!'], whisk: ['Draw fast circles with your finger!', 'Whisk, whisk, whisk!'], mix: ['Stir gently in circles.'],
+    chop: ['Swipe down or tap to chop — keep a steady rhythm!'], knead: ['Drag left and right to knead!'], roll: ['Roll the pin back and forth!'],
+    heat: ['Keep the heat in the green zone — slide up and down.'], tooHot: ["Too hot, it's burning!", 'Careful, lower the heat!'], tooLow: ['A little more heat!'],
+    flip: ['Now swipe up to flip!'], oven: ['Set the oven to {c}°C — turn the dial!'], rest: ['Patience… tap the clock to speed up time.'],
+    layer: ['Tap to add a layer!'], wrap: ['Tap to wrap and seal!'], garnish: ['Tap the plate to garnish!'],
+    great: ['Amazing!', 'Perfect texture!', 'Chef level!'], good: ['Nice one!', 'Well done!'], ok: ['No worries, keep going!'], done: ['Bravo! Enjoy your meal!']
+  },
+  ru: {
+    drag: ['Перетащите нужные продукты в миску!'], wrong: ['Это сейчас не нужно 🙂'], crack: ['Разбейте яйцо вовремя — нажмите в зелёной зоне!'],
+    whisk: ['Быстро рисуйте круги пальцем!'], mix: ['Мешайте плавными кругами.'], chop: ['Проведите вниз или нажмите — режем в ритме!'], knead: ['Двигайте влево-вправо, месите!'],
+    roll: ['Катайте скалку туда-сюда!'], heat: ['Держите огонь в зелёной зоне!'], tooHot: ['Слишком сильно, горит!'], tooLow: ['Чуть сильнее огонь!'], flip: ['Теперь проведите вверх — переверните!'],
+    oven: ['Поставьте духовку на {c}°C!'], rest: ['Терпение… нажмите на часы, ускорим время.'], layer: ['Каждое нажатие — новый слой!'], wrap: ['Нажмите — заверните!'], garnish: ['Нажимайте на тарелку — украшайте!'],
+    great: ['Отлично!', 'Идеальная консистенция!'], good: ['Хорошо!', 'Молодец!'], ok: ['Ничего, продолжаем!'], done: ['Браво! Приятного аппетита!']
+  }
+};
+function chefLine(key, lang, vars) {
+  const set = (CHEF_LINES[lang] || CHEF_LINES.tr)[key] || CHEF_LINES.tr[key] || [''];
+  let s = set[Math.floor(Math.random() * set.length)];
+  if (vars) s = s.replace(/\{(\w+)\}/g, (_, k) => vars[k]);
+  return s;
+}
+const CHEF_RANKS = [[0, 'r1'], [12, 'r2'], [40, 'r3'], [90, 'r4'], [180, 'r5']];
+const CHEF_TOOL = { crack: '🥚', whisk: '🥄', mix: '🥄', chop: '🔪', knead: '👐', roll: '🪵', fry: '🍳', boil: '🥄', bake: '🧤', grill: '🍢', steam: '🥢', wrap: '🌯', layer: '🥧', rest: '⏳', garnish: '🌿', serve: '🍽️' };

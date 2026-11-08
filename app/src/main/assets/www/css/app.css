@@ -695,3 +695,84 @@ html.dark .dtag{background:#14351F;color:#86EFAC}html.dark .dtag.warn{background
 .shop-item.done{opacity:.55}
 .shop-item.done .b span{text-decoration:line-through}
 .shop-item.done .box{background:var(--p);border-color:var(--p)}
+
+/* ================= v1.5: cooking game ================= */
+.k-top #kVoice.on{background:var(--p);color:#fff;border-color:var(--p);animation:pulseBtn 1.6s infinite}
+.k-nav .k-go{flex:1.3}
+.k-stage.playing{touch-action:none;user-select:none}
+.k-stage.game .k-svg{transform:translateX(9%) scale(.92)}
+.k-stage.game .k-items,.k-stage.game .k-fx{transform:translateX(9%) scale(.92)}
+.g-chef{position:absolute;left:-2%;bottom:-4%;width:30%;z-index:8;pointer-events:none;transition:opacity .3s}
+.g-chef .g-body svg{width:100%;height:auto;display:block;animation:bob 2.6s ease-in-out infinite}
+.g-arm{position:absolute;right:-6%;top:62%;width:46%;height:12%;transform-origin:0% 50%;border-radius:20px;background:var(--chef-c,#2F6F62);animation:armIdle 2.6s ease-in-out infinite}
+.g-arm::after{content:"";position:absolute;right:-6%;top:-10%;width:30%;height:120%;border-radius:50%;background:#F2C7A5}
+.g-tool{position:absolute;right:-28%;top:-90%;font-size:26px;transform:rotate(-20deg)}
+.g-chef[data-act=whisk] .g-arm,.g-chef[data-act=mix] .g-arm{animation:armStir .35s linear infinite}
+.g-chef[data-act=chop] .g-arm{animation:armChop .3s ease-in-out infinite}
+.g-chef[data-act=fry] .g-arm,.g-chef[data-act=grill] .g-arm{animation:armShake .25s ease-in-out infinite}
+.g-chef[data-act=knead] .g-arm,.g-chef[data-act=roll] .g-arm{animation:armPush .7s ease-in-out infinite}
+.g-chef[data-act=garnish] .g-arm{animation:armSprinkle .5s ease-in-out infinite}
+.g-chef[data-act=serve] .g-arm{animation:none;transform:rotate(-35deg)}
+@keyframes armIdle{50%{transform:rotate(-8deg)}}
+@keyframes armStir{0%{transform:rotate(-10deg) translateY(0)}25%{transform:rotate(-2deg) translateY(4px)}50%{transform:rotate(6deg) translateY(0)}75%{transform:rotate(-2deg) translateY(-4px)}100%{transform:rotate(-10deg)}}
+@keyframes armChop{50%{transform:rotate(18deg)}}
+@keyframes armShake{50%{transform:rotate(-6deg) translateX(4px)}}
+@keyframes armPush{50%{transform:rotate(4deg) translateX(10px)}}
+@keyframes armSprinkle{50%{transform:rotate(-22deg)}}
+.chef-leyla+.g-arm,.g-chef .g-body:has(.chef-leyla)+.g-arm{--chef-c:#7C4A3A}
+.g-chef .g-body:has(.chef-aylin)+.g-arm{--chef-c:#FFFFFF;border:1.5px solid #D9D4CB}
+.g-chef .g-body:has(.chef-zeynep)+.g-arm{--chef-c:#2F6F62}
+.g-bubble{position:absolute;left:24%;top:9%;max-width:62%;z-index:9;background:var(--card);color:var(--ink);font-size:13px;font-weight:700;padding:8px 12px;border-radius:14px 14px 14px 4px;box-shadow:0 6px 16px -6px rgba(0,0,0,.35);pointer-events:none}
+.g-bubble.pop2{animation:pop .35s ease}
+.k-game{position:absolute;inset:0;z-index:7;pointer-events:none}
+.k-game button,.k-game .dial{pointer-events:auto}
+.g-hint{position:absolute;right:10px;bottom:28px;max-width:66%;background:rgba(0,0,0,.62);color:#fff;font-size:12px;font-weight:700;padding:6px 10px;border-radius:10px;text-align:right}
+.g-meter{position:absolute;left:30%;right:12px;bottom:10px;height:10px;border-radius:10px;background:rgba(255,255,255,.7);overflow:hidden;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+.g-meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,#F59E0B,#22C55E);border-radius:10px;transition:width .15s}
+.g-meter i.lapse{animation:lapse 2.6s linear forwards}.g-meter i.lapse.slow{animation-duration:4.2s}
+@keyframes lapse{to{width:100%}}
+.k-chip.draggable{cursor:grab;touch-action:none}
+.k-chip.shake{animation:shake .45s ease}
+@keyframes shake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+.g-ghost{position:fixed;left:0;top:0;z-index:95;font-size:34px;pointer-events:none;filter:drop-shadow(0 8px 8px rgba(0,0,0,.3))}
+.g-egg{position:absolute;left:58%;top:16%;transform:translateX(-50%) scale(1.3)}
+.g-egg.crack .sh.l{animation:shl .6s ease forwards}.g-egg.crack .sh.r{animation:shr .6s ease forwards}.g-egg.crack .yolk{animation:yolk .6s ease forwards}
+.g-timing{position:absolute;left:30%;right:12px;bottom:12px;height:18px;border-radius:10px;background:rgba(255,255,255,.8);overflow:hidden}
+.g-timing .zone{position:absolute;left:40%;width:20%;top:0;bottom:0;background:#22C55E;opacity:.7}
+.g-timing .cur{position:absolute;top:0;bottom:0;width:6px;margin-left:-3px;background:#141B26;border-radius:3px;animation:sweep 1.1s ease-in-out infinite alternate}
+@keyframes sweep{from{left:2%}to{left:98%}}
+.g-shell{position:absolute;left:58%;top:40%;font-size:22px;animation:pop .4s}
+.fx-tool.follow{transition:left .05s,top .05s}
+.fx-knife.manual{animation:none}
+.fx-knife.manual.hit{animation:chopHit .18s ease}
+@keyframes chopHit{0%{transform:translate(-50%,-80%) rotate(-25deg)}100%{transform:translate(-50%,-30%) rotate(5deg)}}
+.k-stage .fx-flames i,.k-stage .fx-grillfire i{transform-origin:50% 100%;scale:1 var(--heat,1)}
+.k-stage.smoke::before{content:"";position:absolute;inset:0;z-index:6;background:radial-gradient(circle at 60% 40%,rgba(60,60,60,.45),transparent 60%);animation:pulse 1s infinite;pointer-events:none}
+.g-gauge{position:absolute;right:14px;top:8%;bottom:64px;width:22px;border-radius:12px;background:linear-gradient(0deg,#3B82F6,#F59E0B 60%,#EF4444);box-shadow:inset 0 0 0 2px rgba(255,255,255,.7)}
+.g-gauge .zone{position:absolute;left:-4px;right:-4px;border:3px solid #22C55E;border-radius:8px;background:rgba(34,197,94,.2)}
+.g-gauge.ok .zone{box-shadow:0 0 0 4px rgba(34,197,94,.35)}
+.g-gauge .needle{position:absolute;left:-10px;right:-10px;height:4px;margin-bottom:-2px;background:#141B26;border-radius:2px}
+.g-gauge .knob{position:absolute;left:-16px;width:12px;height:12px;margin-bottom:-6px;border-radius:50%;background:#fff;border:3px solid #141B26}
+.g-dial{position:absolute;right:16px;top:8%;display:flex;flex-direction:column;align-items:center;gap:8px}
+.g-dial .dial{width:110px;height:110px;border-radius:50%;background:radial-gradient(circle,#fff 0 55%,#E5E7EB 56%);border:4px solid #374151;position:relative;touch-action:none;cursor:grab}
+.g-dial .dial.ok{border-color:#22C55E}
+.g-dial .hand{position:absolute;left:50%;top:10%;width:6px;height:40%;margin-left:-3px;background:#EF4444;border-radius:3px;transform-origin:50% 100%;transform:rotate(-135deg)}
+.g-dial .val{position:absolute;left:0;right:0;bottom:22%;text-align:center;font-size:14px}
+.g-dial .g-ok{height:36px;padding:0 18px}
+.g-clock{position:absolute;right:20px;top:12%;font-size:48px;animation:tick 1s steps(2) infinite;background:none}
+.g-garn{position:absolute;transform:translate(-50%,-50%);font-size:22px;animation:pop .3s ease;z-index:3}
+.g-layer{position:absolute;left:30%;width:44%;height:8px;border-radius:4px;background:linear-gradient(90deg,#F3D9A4,#E9C27E);box-shadow:0 2px 3px rgba(0,0,0,.15);animation:pop .3s ease}
+.g-stars{position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;gap:6px;pointer-events:none;background:radial-gradient(circle,rgba(255,255,255,.35),transparent 60%)}
+.g-stars span{font-size:54px;color:#D1D5DB;animation:starIn .45s cubic-bezier(.3,1.6,.5,1) both;text-shadow:0 4px 10px rgba(0,0,0,.2)}
+.g-stars span.on{color:#FBBF24}
+@keyframes starIn{from{transform:scale(0) rotate(-90deg);opacity:0}to{transform:none;opacity:1}}
+.g-score{flex:1;display:flex;align-items:center;justify-content:center;font-weight:800;color:#B45309;background:#FEF3C7;border-radius:14px;font-size:14px}
+.g-result{background:linear-gradient(135deg,#FEF3C7,#FDE68A);color:#78350F;border-radius:20px;padding:14px;text-align:center;margin-bottom:10px;animation:pop .5s ease}
+.g-result .g-big span{font-size:44px;color:#E5E7EB;display:inline-block;animation:starIn .5s cubic-bezier(.3,1.6,.5,1) both}
+.g-result .g-big span.on{color:#F59E0B}
+.g-result b{display:block;font-size:18px}
+.g-result small{display:block;font-size:12px;margin-top:4px}
+.g-rank{height:8px;border-radius:8px;background:rgba(0,0,0,.1);overflow:hidden;margin-top:6px}
+.g-rank i{display:block;height:100%;background:#F59E0B;border-radius:8px}
+.rank-card{display:flex;gap:12px;align-items:center;margin:4px 16px 8px;background:linear-gradient(135deg,#FEF3C7,#FDE68A);color:#78350F;border-radius:14px;padding:10px 12px}
+.rank-card span{font-size:28px}.rank-card div{flex:1}.rank-card b{display:block}.rank-card small{font-size:12px}

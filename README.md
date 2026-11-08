@@ -19,6 +19,8 @@
 | Şef karakterleri | Leyla nənə, Şef Aylin, Zeynep teyze — yaşa, yemeğe göre ya da rastgele |
 | Ülke sayfası | İmza yemek, fotoğraf, güçlü olduğu alan (kahvaltı / ana yemek / ara sıcak / tatlı), hikaye, açıklama |
 | Seyahat | Önce konum izni; yakındaki restoranlar uygulama içinde liste + vektör harita (MapLibre/OpenFreeMap). Gemini anahtarı varsa Google Haritalar puan ve yorumlarıyla. Tüm aramalar telefonda saklanır |
+| Pişirme oyunu | Şef karakterli oyun modu: malzemeleri sürükle-bırak, yumurtayı zamanında kır, daire çizerek çırp, ritimle doğra, yoğur/aç, ateşi yeşil bölgede tut, fırın kadranını ayarla, süsle; adım başına 1-3 yıldız, rütbeler (Çırak → Büyük Şef), ses efektleri |
+| Sesli asistan | Adımları sesli okur; "sonraki / geri / tekrar / zamanlayıcı / dur" komutları (TR, AZ, EN, RU) |
 | Mutfak animasyonu | Her tarif için: malzemeler kaba uçar ve listeden çıkar, yumurta kırma, çırpma, doğrama, kızartma, kaynatma, fırın; kıvam bilgisi, süre ve zamanlayıcı, atla, servis sunumu, kamerada "masada gör" |
 | Elimdekiler | Görselli malzeme seçici (160 ürün, 7 kategori, 4 dil, yazınca öneri), eşleşen tarifler (% eşleşme, eksikler) + Gemini ile özel tarif |
 | Porsiyon & alışveriş | Kişi sayısına göre miktarlar yeniden hesaplanır; eksikler tek dokunuşla Listem → Alışveriş'e, kategorilere göre |

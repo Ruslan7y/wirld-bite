@@ -16,6 +16,15 @@ import android.provider.MediaStore;
 import android.util.Base64;
 import android.webkit.PermissionRequest;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.Locale;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import android.speech.RecognitionListener;
+import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -36,6 +45,11 @@ public class MainActivity extends Activity {
     private static final int REQ_LOCATION = 42;
     private static final int REQ_CAMERA = 43;
     private PermissionRequest pendingCamera;
+    private static final int REQ_MIC = 44;
+    private TextToSpeech tts;
+    private boolean ttsReady = false;
+    private SpeechRecognizer recognizer;
+    private String pendingListenLang;
 
     private WebView web;
     private GeolocationPermissions.Callback geoCallback;
@@ -65,6 +79,14 @@ public class MainActivity extends Activity {
         s.setTextZoom(100);
 
         web.addJavascriptInterface(new Bridge(), "Android");
+        tts = new TextToSpeech(this, status -> {
+            ttsReady = status == TextToSpeech.SUCCESS;
+            if (ttsReady) tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                @Override public void onStart(String id) { }
+                @Override public void onDone(String id) { js("WB.onSpeakDone && WB.onSpeakDone()"); }
+                @Override public void onError(String id) { js("WB.onSpeakDone && WB.onSpeakDone()"); }
+            });
+        });
 
         web.setWebViewClient(new WebViewClient() {
             @Override
@@ -118,6 +140,11 @@ public class MainActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQ_MIC) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED && pendingListenLang != null) startListening(pendingListenLang);
+            else js("WB.onVoiceEnd && WB.onVoiceEnd('denied')");
+            pendingListenLang = null;
+        }
         if (requestCode == REQ_CAMERA && pendingCamera != null) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED)
                 pendingCamera.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
@@ -137,6 +164,41 @@ public class MainActivity extends Activity {
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(i);
         } catch (ActivityNotFoundException ignored) { }
+    }
+
+    private void js(final String code) { runOnUiThread(() -> { if (web != null) web.evaluateJavascript(code, null); }); }
+
+    private void startListening(String lang) {
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) { js("WB.onVoiceEnd && WB.onVoiceEnd('unavailable')"); return; }
+        if (recognizer == null) {
+            recognizer = SpeechRecognizer.createSpeechRecognizer(this);
+            recognizer.setRecognitionListener(new RecognitionListener() {
+                @Override public void onResults(Bundle b) {
+                    ArrayList<String> r = b.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                    js("WB.onVoice && WB.onVoice(" + new JSONArray(r == null ? new ArrayList<String>() : r).toString() + ")");
+                }
+                @Override public void onError(int error) { js("WB.onVoiceEnd && WB.onVoiceEnd(" + error + ")"); }
+                @Override public void onReadyForSpeech(Bundle p) { }
+                @Override public void onBeginningOfSpeech() { }
+                @Override public void onRmsChanged(float v) { }
+                @Override public void onBufferReceived(byte[] b) { }
+                @Override public void onEndOfSpeech() { }
+                @Override public void onPartialResults(Bundle b) { }
+                @Override public void onEvent(int t, Bundle b) { }
+            });
+        }
+        Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang);
+        i.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
+        try { recognizer.startListening(i); } catch (Exception e) { js("WB.onVoiceEnd && WB.onVoiceEnd('err')"); }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (tts != null) tts.shutdown();
+        if (recognizer != null) recognizer.destroy();
+        super.onDestroy();
     }
 
     @Override
@@ -201,6 +263,41 @@ public class MainActivity extends Activity {
                 try { startActivity(Intent.createChooser(send, "World Bite")); } catch (Exception ignored) { }
             });
         }
+
+        @JavascriptInterface
+        public void speak(final String text, final String lang) {
+            runOnUiThread(() -> {
+                if (!ttsReady) { js("WB.onSpeakDone && WB.onSpeakDone()"); return; }
+                Locale loc = Locale.forLanguageTag(lang);
+                int r = tts.setLanguage(loc);
+                if (r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    // Azerbaijani voices are rare: fall back to Turkish, then English
+                    if (tts.setLanguage(new Locale("tr", "TR")) < 0) tts.setLanguage(Locale.ENGLISH);
+                }
+                tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "wb" + System.currentTimeMillis());
+            });
+        }
+
+        @JavascriptInterface
+        public void stopSpeak() { runOnUiThread(() -> { if (tts != null) tts.stop(); }); }
+
+        @JavascriptInterface
+        public boolean hasRecognizer() { return SpeechRecognizer.isRecognitionAvailable(MainActivity.this); }
+
+        @JavascriptInterface
+        public void listen(final String lang) {
+            runOnUiThread(() -> {
+                if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                    pendingListenLang = lang;
+                    requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQ_MIC);
+                    return;
+                }
+                startListening(lang);
+            });
+        }
+
+        @JavascriptInterface
+        public void stopListen() { runOnUiThread(() -> { if (recognizer != null) { try { recognizer.cancel(); } catch (Exception ignored) { } } }); }
 
         @JavascriptInterface
         public void keepAwake(final boolean on) {

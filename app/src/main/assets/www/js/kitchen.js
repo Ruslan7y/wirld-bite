@@ -62,7 +62,7 @@ const Kitchen = (() => {
   }
   function shortName(line) {
     let s = line.replace(/^[^:]{0,22}:\s*/, '').replace(/\(.*?\)/g, '').trim();
-    s = s.replace(/^[\d½¼¾⅓⅔.,\-–\s]+(kg|g|gr|ml|litre|l|su bardağı|yemek kaşığı|tatlı kaşığı|çay kaşığı|paket|demet|diş|baş|dilim|kutu|tutam|avuç|adet|kase)?(?=\s|$)\s*/i, '');
+    s = s.replace(/^[\d½¼¾⅓⅔.,\-–\s]+(kg|g|gr|ml|litre|l|su bardağı|yemek kaşığı|tatlı kaşığı|çay kaşığı|paket|demet|diş|baş|dilim|kutu|tutam|avuç|adet|kase|dal|yaprak|tane)?(?=\s|$)\s*/i, '');
     return s.length > 26 ? s.slice(0, 24) + '…' : s;
   }
   function detect(step) {
@@ -177,19 +177,20 @@ const Kitchen = (() => {
     let idx = -1, vessel = 'bowl', content = [], timer = null, playing = null;
 
     const el = ctx.pushPage(`
-      <div class="k-top"><button class="round" data-back>✕</button><div class="k-title"><b>${esc(R.name)}</b><small id="kSub">${esc(R.country || '')}</small></div><button class="round" id="kList">🧺</button></div>
+      <div class="k-top"><button class="round" data-back>✕</button><div class="k-title"><b>${esc(R.name)}</b><small id="kSub">${esc(R.country || '')}</small></div><button class="round" id="kVoice" title="voice">🎙️</button><button class="round" id="kList">🧺</button></div>
       <div class="k-bar"><i id="kBar"></i></div>
       <div class="k-stage" id="kStage">
         <svg class="k-svg" viewBox="0 0 360 240" preserveAspectRatio="xMidYMid meet"><defs><linearGradient id="kGlass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".18"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></linearGradient></defs><g id="kVessel"></g></svg>
         <div class="k-items" id="kItems"></div><div class="k-fx" id="kFx"></div><div class="k-fly" id="kFly"></div>
         <div class="k-badge" id="kBadge"></div>
+        <div class="g-chef hide" id="kChef"></div><div class="g-bubble hide" id="kBubble"></div><div class="k-game" id="kGame"></div>
       </div>
       <div class="k-tray" id="kTray"></div>
       <div class="k-card" id="kCard"></div>
       <div class="k-nav" id="kNav"></div>`, () => {}, 'kitchen');
     if (!el) return;
     ctx.keepAwake(true);
-    el._onClose = () => { ctx.keepAwake(false); stopTimer(); stopCamera(); };
+    el._onClose = () => { ctx.keepAwake(false); stopTimer(); stopCamera(); gtoken = {}; if (cur) cur.stop(); Voice.stop(); };
     const $ = s => el.querySelector(s);
 
     function drawTray(highlight) {
@@ -249,6 +250,10 @@ const Kitchen = (() => {
       const s = low(st.text), left = items.filter(x => !x.used);
       if (/tüm malzeme|bütün malzeme|hepsini|malzemeleri karıştır|tüm hamur malzeme/.test(s)) return left;
       let hit = left.filter(x => x.keys.some(k => k.test(s)));
+      // generic words: "greens", "vegetables", "spices", "dry ingredients"
+      if (/yeşillik|otları|otlar|\bherbs|зелень/.test(s)) hit = hit.concat(left.filter(x => x.emoji === '🌿' && !hit.includes(x)));
+      if (/sebze|vegetables|овощ/.test(s)) hit = hit.concat(left.filter(x => ['🥕', '🧅', '🫑', '🥬', '🍅', '🍆', '🥔', '🥒', '🎃', '🌶️'].includes(x.emoji) && !hit.includes(x)));
+      if (/baharat|spices|специ/.test(s)) hit = hit.concat(left.filter(x => x.emoji === '🧂' && !hit.includes(x)));
       return hit;
     }
 
@@ -262,8 +267,10 @@ const Kitchen = (() => {
       const n = R.nutri;
       $('#kCard').innerHTML = `${R.chef ? `<div class="k-chef"><div class="k-chef-av">${chefSVG(R.chef.id, 'happy')}</div><div class="bubble">${esc(t('chefHello', { n: R.chef.name }))}</div></div>` : ''}<div class="k-intro"><h2>${t('miseTitle')}</h2><p>${t('miseText', { n: items.length, s: steps.length })}</p>
         <div class="k-meta"><span>⏱ ${R.time || ''}</span><span>👥 ${R.servings} ${t('servings')}</span>${n ? `<span>🔥 ${n.kcal} kcal</span>` : ''}</div></div>`;
-      $('#kNav').innerHTML = `<button class="btn primary block k-go" id="kStart">▶ ${t('startCooking')}</button>`;
-      $('#kStart').onclick = () => go(0);
+      $('#kNav').innerHTML = `<button class="btn primary k-go" id="kGameBtn">🎮 ${t('gameMode')}</button><button class="btn ghost" id="kStart">👩‍🍳 ${t('realMode')}</button>`;
+      $('#kGameBtn').onclick = () => startMode('game');
+      $('#kStart').onclick = () => startMode('real');
+      $('#kVoice').onclick = () => voiceToggle();
     }
     async function go(i) {
       stopTimer();
@@ -284,6 +291,7 @@ const Kitchen = (() => {
       $('#kSkip').onclick = () => { playing = null; need.forEach(x => { if (!x.used) { x.used = true; content.push(x.emoji); } }); go(i + 1); };
       $('#kNext').onclick = () => go(i + 1);
       if ($('#kTimer')) $('#kTimer').onclick = () => startTimer(st.dur, L[st.act]);
+      if (Voice.on) readStep();
       // play: ingredients fly in one by one, then the action loops
       for (const it of need) { if (playing !== token) return; await fly(it); }
       if (playing !== token) return;
@@ -325,7 +333,7 @@ const Kitchen = (() => {
         <p>${esc(servingText || t('serveDefault'))}</p>
         ${sides.length ? `<div class="k-tags"><span class="k-tag c">🍽️ <b>${t('serveWith')}:</b> ${esc(sides.join(', '))}</span></div>` : ''}</div>`;
       $('#kNav').innerHTML = `<button class="btn line" id="kAgain">↺</button><button class="btn ghost" id="kCam">📷 ${t('seeOnTable')}</button><button class="btn primary" id="kDone">${t('finish')} ✓</button>`;
-      $('#kAgain').onclick = () => { items.forEach(x => x.used = false); content = []; $('#kStage').classList.remove('served'); intro(); };
+      $('#kAgain').onclick = () => { items.forEach(x => x.used = false); content = []; stars = []; $('#kStage').classList.remove('served', 'game'); $('#kChef').classList.add('hide'); $('#kBubble').classList.add('hide'); intro(); };
       $('#kDone').onclick = () => ctx.back();
       $('#kCam').onclick = camera;
     }
@@ -393,6 +401,321 @@ const Kitchen = (() => {
       pv.querySelector('#kShotShare').onclick = () => { try { if (window.Android && Android.shareImage) { Android.shareImage(url, R.name); return; } } catch (e) {} ctx.toast(t('savedPhoto')); };
     }
     function $$(s, r) { return [...(r || el).querySelectorAll(s)]; }
+
+
+    /* =================== GAME MODE =================== */
+    let mode = 'real', stars = [], cur = null, gtoken = null;
+    const G = () => $('#kGame');
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    function chefShow(act, mood) {
+      const c = $('#kChef'); if (!R.chef || !c) return;
+      c.classList.remove('hide'); c.dataset.act = act || 'idle';
+      c.innerHTML = `<div class="g-body">${chefSVG(R.chef.id, mood || 'happy')}</div><div class="g-arm"><span class="g-tool">${CHEF_TOOL[act] || '🥄'}</span></div>`;
+    }
+    function say(key, vars, mood, speakIt) {
+      const b = $('#kBubble'); if (!b) return;
+      const txt = key.startsWith('!') ? key.slice(1) : chefLine(key, ctx.lang, vars);
+      b.textContent = txt; b.classList.remove('hide', 'pop2'); void b.offsetWidth; b.classList.add('pop2');
+      if (mood) { const body = $('#kChef .g-body'); if (body) body.innerHTML = chefSVG(R.chef.id, mood); }
+      if (speakIt !== false && Voice.on) Voice.speak(txt);
+    }
+    function meter(label) {
+      G().innerHTML = `<div class="g-hint">${label}</div><div class="g-meter"><i></i></div>`;
+      return p => { const i = G().querySelector('.g-meter i'); if (i) i.style.width = Math.min(100, p * 100) + '%'; };
+    }
+    function mini(setup) {
+      // each mini-game resolves with a score 0..1; Skip resolves 0.5
+      return new Promise(res => {
+        let done = false; const offs = [];
+        const finish = sc => { if (done) return; done = true; offs.forEach(f => f()); cur = null; $('#kStage').classList.remove('playing'); res(Math.max(0, Math.min(1, sc))); };
+        const on = (target, ev, fn, opt) => { target.addEventListener(ev, fn, opt); offs.push(() => target.removeEventListener(ev, fn, opt)); };
+        cur = { skip: () => finish(.5), stop: () => { done = true; offs.forEach(f => f()); } };
+        $('#kStage').classList.add('playing');
+        setup(finish, on, offs);
+      });
+    }
+    const center = () => { const r = $('#kStage').getBoundingClientRect(), c = CONTENT_CENTER[vessel] || [180, 130]; return { x: r.left + r.width * c[0] / 360, y: r.top + r.height * c[1] / 240, r }; };
+
+    /* 1 — drag the right ingredients into the vessel */
+    function dragGame(need) {
+      const showHint = () => { G().innerHTML = `<div class="g-hint">🧺 ${chefLine('drag', ctx.lang)}</div>`; };
+      showHint();
+      return mini((finish, on) => {
+        let mistakes = 0, left = need.length;
+        drawTray(); $$('.k-chip', el).forEach(c => c.classList.add('draggable'));
+        const hintTimer = setTimeout(() => drawTrayHL(), 6000);
+        function drawTrayHL() { need.filter(x => !x.used).forEach(x => { const c = $(`.k-chip[data-i="${x.i}"]`); c && c.classList.add('hl'); }); }
+        on($('#kTray'), 'pointerdown', e => {
+          const chip = e.target.closest('.k-chip'); if (!chip) return;
+          const item = items.find(x => x.i === +chip.dataset.i); if (!item || item.used) return;
+          e.preventDefault();
+          const ghost = document.createElement('div'); ghost.className = 'g-ghost'; ghost.textContent = item.emoji; document.body.appendChild(ghost);
+          const mv = ev => { ghost.style.transform = `translate(${ev.clientX - 22}px,${ev.clientY - 30}px) scale(1.3)`; };
+          mv(e); chip.classList.add('going');
+          const up = async ev => {
+            window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);
+            const r = $('#kStage').getBoundingClientRect(), inside = ev.clientX > r.left && ev.clientX < r.right && ev.clientY > r.top && ev.clientY < r.bottom;
+            if (inside && need.includes(item)) {
+              ghost.remove(); SFX.play('pop'); SFX.vibrate(15);
+              if (item.emoji === '🥚') { item.used = true; drawTray(); $$('.k-chip', el).forEach(c => c.classList.add('draggable')); await crackGame(); if (left > 1) { say('drag', null, 'happy', false); showHint(); } }
+              else { item.used = true; content.push(item.emoji); paintContent(); dropEmoji(item.emoji); drawTray(); $$('.k-chip', el).forEach(c => c.classList.add('draggable')); }
+              if (item.emoji === '🥚') { content.push('🥚'); paintContent(); dropEmoji('🥚'); }
+              if (--left <= 0) { clearTimeout(hintTimer); finish(1 - mistakes * .2); }
+            } else {
+              chip.classList.remove('going');
+              ghost.animate([{ opacity: 1 }, { opacity: 0, transform: ghost.style.transform + ' translateY(40px)' }], { duration: 300 }).onfinish = () => ghost.remove();
+              if (inside) { mistakes++; SFX.play('fail'); SFX.vibrate([40, 40, 40]); chip.classList.add('shake'); setTimeout(() => chip.classList.remove('shake'), 500); say('wrong', null, 'wow', false); drawTrayHL(); }
+            }
+          };
+          window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+        });
+      });
+    }
+    /* 2 — crack the egg on time */
+    function crackGame() {
+      say('crack');
+      return new Promise(res => {
+        const g = G(); g.innerHTML = `<div class="g-hint">${chefLine('crack', ctx.lang)}</div><div class="g-egg">${EGG}</div><div class="g-timing"><span class="zone"></span><i class="cur"></i></div>`;
+        const stage = $('#kStage');
+        const tap = () => {
+          stage.removeEventListener('pointerdown', tap);
+          const bar = g.querySelector('.g-timing').getBoundingClientRect(), c = g.querySelector('.cur').getBoundingClientRect();
+          const p = (c.left + c.width / 2 - bar.left) / bar.width, d = Math.abs(p - .5);
+          const sc = d < .1 ? 1 : d < .25 ? .7 : .4;
+          g.querySelector('.cur').style.animationPlayState = 'paused';
+          g.querySelector('.g-egg').classList.add('crack'); SFX.play('crack'); SFX.vibrate(30);
+          if (sc < .5) g.insertAdjacentHTML('beforeend', '<div class="g-shell">🥚💥</div>');
+          setTimeout(() => { g.innerHTML = ''; res(sc); }, 750);
+        };
+        setTimeout(() => stage.addEventListener('pointerdown', tap), 200);
+      });
+    }
+    /* 3 — draw circles to whisk / stir */
+    function circleGame(turns, fast) {
+      say(fast ? 'whisk' : 'mix');
+      const set = meter(fast ? '🌀 ' + chefLine('whisk', ctx.lang) : '🥄 ' + chefLine('mix', ctx.lang));
+      $('#kFx').innerHTML = effectHTML(fast ? 'whisk' : 'mix', vessel);
+      const tool = $('#kFx .fx-tool'); if (tool) tool.classList.add('follow');
+      return mini((finish, on) => {
+        let acc = 0, last = null, t0 = null, lastSound = 0;
+        const st = $('#kStage');
+        on(st, 'pointerdown', e => { last = null; t0 = t0 || performance.now(); st.setPointerCapture && st.setPointerCapture(e.pointerId); });
+        on(st, 'pointermove', e => {
+          if (!(e.buttons || e.pointerType === 'touch')) return;
+          const c = center(), a = Math.atan2(e.clientY - c.y, e.clientX - c.x);
+          if (tool) { tool.style.left = ((e.clientX - c.r.left) / c.r.width * 100) + '%'; tool.style.top = ((e.clientY - c.r.top) / c.r.height * 100) + '%'; }
+          if (last != null) { let d = a - last; if (d > Math.PI) d -= 2 * Math.PI; if (d < -Math.PI) d += 2 * Math.PI; acc += Math.abs(d); }
+          last = a; t0 = t0 || performance.now();
+          const now = performance.now(); if (now - lastSound > 220) { SFX.play('whisk'); lastSound = now; }
+          const p = acc / (Math.PI * 2 * turns); set(p);
+          const sw = $('#kFx .fx-swirl'); if (sw) sw.style.animationDuration = Math.max(.25, 1.2 - p) + 's';
+          if (p >= 1) { const secs = (now - t0) / 1000; finish(secs < turns * 1.5 ? 1 : secs < turns * 2.8 ? .75 : .55); }
+        });
+        on(st, 'pointerup', () => (last = null));
+      });
+    }
+    /* 4 — tap / swipe down rhythmically to chop; also layers, wrapping, garnish */
+    function tapGame(kind, n) {
+      const set = meter({ chop: '🔪 ', layer: '🥧 ', wrap: '🌯 ', garnish: '🌿 ' }[kind] + chefLine(kind, ctx.lang));
+      say(kind);
+      if (kind === 'chop') $('#kFx').innerHTML = effectHTML('chop', vessel).replace('fx-knife', 'fx-knife manual');
+      return mini((finish, on) => {
+        let k = 0; const times = [];
+        on($('#kStage'), 'pointerdown', e => {
+          k++; times.push(performance.now()); set(k / n);
+          const r = $('#kStage').getBoundingClientRect(), x = (e.clientX - r.left) / r.width * 100, y = (e.clientY - r.top) / r.height * 100;
+          if (kind === 'chop') { const kn = $('#kFx .fx-knife'); if (kn) { kn.classList.remove('hit'); void kn.offsetWidth; kn.classList.add('hit'); } SFX.play('chop'); SFX.vibrate(12); dropEmoji(content[content.length - 1] || '🥕'); }
+          else if (kind === 'garnish') { const g = document.createElement('span'); g.className = 'g-garn'; g.textContent = ['🌿', '🍋', '🌱', '✨', '🫒'][k % 5]; g.style.left = x + '%'; g.style.top = y + '%'; $('#kItems').appendChild(g); SFX.play('star'); }
+          else if (kind === 'layer') { const l = document.createElement('i'); l.className = 'g-layer'; l.style.bottom = (24 + k * 3) + '%'; $('#kItems').appendChild(l); SFX.play('pop'); }
+          else { const w = $('#kItems .k-in-item:last-child'); w && w.animate([{ transform: 'translate(-50%,-50%) rotateY(0)' }, { transform: 'translate(-50%,-50%) rotateY(180deg)' }], { duration: 300 }); SFX.play('pop'); }
+          if (k >= n) {
+            let sc = 1;
+            if (kind === 'chop' && times.length > 3) { const iv = times.slice(1).map((v, i) => v - times[i]), m = iv.reduce((a, b) => a + b) / iv.length, sd = Math.sqrt(iv.reduce((a, b) => a + (b - m) ** 2, 0) / iv.length); sc = sd / m < .35 ? 1 : sd / m < .6 ? .75 : .55; }
+            finish(sc);
+          }
+        });
+      });
+    }
+    /* 5 — drag back and forth to knead / roll */
+    function dragLenGame(kind, need) {
+      const set = meter((kind === 'roll' ? '🪵 ' : '👐 ') + chefLine(kind, ctx.lang)); say(kind);
+      $('#kFx').innerHTML = effectHTML(kind, vessel);
+      const dough = $('.k-content', el); if (dough && vessel === 'board') { dough.setAttribute('rx', 70); dough.setAttribute('ry', 22); if (!content.length) dough.setAttribute('fill', '#EED7A6'); }
+      return mini((finish, on) => {
+        let dist = 0, lastX = null, t0 = null; const st = $('#kStage'), w = st.getBoundingClientRect().width;
+        on(st, 'pointerdown', e => { lastX = e.clientX; t0 = t0 || performance.now(); });
+        on(st, 'pointermove', e => {
+          if (lastX == null) return; dist += Math.abs(e.clientX - lastX); lastX = e.clientX;
+          const p = dist / (w * need); set(p);
+          if (dough) dough.style.transform = kind === 'roll' ? `scale(${1 + p * .6},${1 - p * .3})` : `scale(${1 + Math.sin(dist / 30) * .08},${1 - Math.sin(dist / 30) * .08})`;
+          if (dough) dough.style.transformOrigin = '170px 156px';
+          if (p >= 1) { const s = (performance.now() - t0) / 1000; finish(s < need * 2.2 ? 1 : s < need * 4 ? .75 : .55); }
+        });
+        on(st, 'pointerup', () => (lastX = null));
+      });
+    }
+    /* 6 — keep the heat in the green zone (fry, boil, simmer, grill) */
+    function heatGame(act, step) {
+      const low = /kısık|simmer|hafif/.test(step.text.toLocaleLowerCase('tr'));
+      const zone = act === 'grill' ? [.62, .88] : act === 'fry' ? [.55, .8] : low ? [.2, .42] : [.4, .65];
+      say('heat');
+      $('#kFx').innerHTML = effectHTML(act === 'grill' ? 'grill' : act, vessel);
+      G().innerHTML = `<div class="g-hint">🔥 ${chefLine('heat', ctx.lang)}</div><div class="g-gauge"><span class="zone" style="bottom:${zone[0] * 100}%;height:${(zone[1] - zone[0]) * 100}%"></span><i class="needle"></i><b class="knob"></b></div><div class="g-meter"><i></i></div>`;
+      const dur = 6000;
+      return mini((finish, on) => {
+        let heat = .3, knob = .3, inZone = 0, t = 0, lastT = performance.now(), warnT = 0, raf, flipAsk = act === 'fry', flipped = false, lastSz = 0;
+        const g = G(), needle = g.querySelector('.needle'), kb = g.querySelector('.knob'), bar = g.querySelector('.g-meter i'), st = $('#kStage');
+        const setKnob = e => { const r = g.querySelector('.g-gauge').getBoundingClientRect(); const sr = st.getBoundingClientRect(); knob = Math.max(0, Math.min(1, 1 - (e.clientY - sr.top) / sr.height * 1.1 + .05)); };
+        on(st, 'pointerdown', e => setKnob(e)); on(st, 'pointermove', e => { if (e.buttons || e.pointerType === 'touch') setKnob(e); });
+        const loop = now => {
+          const dt = Math.min(64, now - lastT); lastT = now; t += dt;
+          heat += (knob - heat) * .045 + (Math.random() - .45) * .012 + .0016; heat = Math.max(0, Math.min(1, heat));
+          needle.style.bottom = (heat * 100) + '%'; kb.style.bottom = (knob * 100) + '%';
+          st.style.setProperty('--heat', (.4 + heat * 1.1).toFixed(2));
+          const ok = heat >= zone[0] && heat <= zone[1]; if (ok) inZone += dt; g.querySelector('.g-gauge').classList.toggle('ok', ok);
+          st.classList.toggle('smoke', heat > zone[1] + .12);
+          if (now - warnT > 2200) { if (heat > zone[1] + .1) { say('tooHot', null, 'wow'); SFX.play('fail'); warnT = now; } else if (heat < zone[0] - .15 && t > 1500) { say('tooLow', null, null, false); warnT = now; } }
+          if (now - lastSz > 600) { SFX.play(act === 'fry' || act === 'grill' ? 'sizzle' : 'bubble'); lastSz = now; }
+          bar.style.width = Math.min(100, t / dur * 100) + '%';
+          if (t >= dur) {
+            const sc = inZone / dur;
+            if (flipAsk && !flipped) {
+              flipped = true; say('flip'); g.querySelector('.g-hint').textContent = '⬆️ ' + chefLine('flip', ctx.lang);
+              let y0 = null, gotIt = false;
+              const dn = e => (y0 = e.clientY), up = e => { if (y0 != null && y0 - e.clientY > 40) { gotIt = true; SFX.play('pop'); $('#kItems').animate([{ transform: 'translateY(0) rotateX(0)' }, { transform: 'translateY(-30px) rotateX(180deg)' }, { transform: 'translateY(0) rotateX(360deg)' }], { duration: 600 }); } };
+              st.addEventListener('pointerdown', dn); st.addEventListener('pointerup', up);
+              setTimeout(() => { st.removeEventListener('pointerdown', dn); st.removeEventListener('pointerup', up); st.classList.remove('smoke'); finish(sc + (gotIt ? .15 : 0)); }, 2600);
+              return;
+            }
+            st.classList.remove('smoke'); finish(sc + .1); return;
+          }
+          raf = requestAnimationFrame(loop);
+        };
+        raf = requestAnimationFrame(loop);
+        on(window, 'wb-stop', () => cancelAnimationFrame(raf));
+        const _stop = cur.stop; cur.stop = () => { cancelAnimationFrame(raf); _stop(); };
+        const _skip = cur.skip; cur.skip = () => { cancelAnimationFrame(raf); st.classList.remove('smoke'); _skip(); };
+      });
+    }
+    /* 7 — set the oven dial */
+    function ovenGame(step) {
+      const m = step.text.match(/(\d{2,3})\s*°/); const target = m ? +m[1] : 180;
+      say('oven', { c: target });
+      G().innerHTML = `<div class="g-hint">🌡️ ${chefLine('oven', ctx.lang, { c: target })}</div><div class="g-dial"><div class="dial"><i class="hand"></i><b class="val">0°C</b></div><button class="btn primary g-ok">✓</button></div>`;
+      return mini((finish, on) => {
+        let val = 0; const dial = G().querySelector('.dial'), hand = G().querySelector('.hand'), out = G().querySelector('.val');
+        const setA = e => { const r = dial.getBoundingClientRect(); let a = Math.atan2(e.clientX - (r.left + r.width / 2), -(e.clientY - (r.top + r.height / 2))) * 180 / Math.PI; a = Math.max(-135, Math.min(135, a)); val = Math.round((a + 135) / 270 * 250 / 5) * 5; hand.style.transform = `rotate(${a}deg)`; out.textContent = val + '°C'; dial.classList.toggle('ok', Math.abs(val - target) <= 10); };
+        on(dial, 'pointerdown', e => { dial.setPointerCapture && dial.setPointerCapture(e.pointerId); setA(e); });
+        on(dial, 'pointermove', e => { if (e.buttons || e.pointerType === 'touch') setA(e); });
+        on(G().querySelector('.g-ok'), 'click', async () => {
+          const d = Math.abs(val - target); const sc = d <= 10 ? 1 : d <= 30 ? .75 : .45;
+          G().innerHTML = `<div class="g-hint">⏩ ${val}°C · ${t('timeLapse')}</div><div class="g-meter"><i class="lapse"></i></div>`;
+          $('#kFx').innerHTML = effectHTML('bake', 'oven'); SFX.play('ding');
+          await sleep(2600); finish(sc);
+        });
+      });
+    }
+    /* 8 — waiting / resting: tap the clock to fast-forward */
+    function waitGame() {
+      say('rest');
+      G().innerHTML = `<div class="g-hint">⏳ ${chefLine('rest', ctx.lang)}</div><button class="g-clock">🕰️</button><div class="g-meter"><i class="lapse slow"></i></div>`;
+      $('#kFx').innerHTML = effectHTML('rest', vessel);
+      return mini((finish, on) => {
+        const tm = setTimeout(() => finish(1), 4200);
+        on(G().querySelector('.g-clock'), 'click', () => { clearTimeout(tm); SFX.play('ding'); finish(1); });
+      });
+    }
+
+    function actionGame(st, need) {
+      switch (st.act) {
+        case 'whisk': return circleGame(4, true);
+        case 'mix': return circleGame(2, false);
+        case 'chop': return tapGame('chop', 8);
+        case 'layer': return tapGame('layer', 5);
+        case 'wrap': return tapGame('wrap', 4);
+        case 'garnish': return tapGame('garnish', 5);
+        case 'knead': return dragLenGame('knead', 5);
+        case 'roll': return dragLenGame('roll', 4);
+        case 'fry': case 'boil': case 'grill': case 'steam': return heatGame(st.act, st);
+        case 'bake': return ovenGame(st);
+        case 'rest': return waitGame();
+        case 'serve': return Promise.resolve(1);
+        default: return circleGame(2, false);
+      }
+    }
+    async function playGame(i) {
+      stopTimer(); if (cur) cur.stop();
+      const token = {}; gtoken = token;
+      if (i >= steps.length) return serveGame();
+      idx = i; const st = steps[i];
+      $('#kBar').style.width = ((i + 1) / (steps.length + 1) * 100) + '%';
+      $('#kSub').textContent = t('stepOf', { i: i + 1, n: steps.length });
+      setVessel(st.vessel); $('#kFx').innerHTML = ''; G().innerHTML = '';
+      $('#kStage').dataset.act = '';
+      $('#kBadge').innerHTML = `<span>${ICON[st.act]} ${L[st.act]}</span>`;
+      chefShow(st.act, 'happy');
+      $('#kCard').innerHTML = `<div class="k-step"><div class="k-act">${ICON[st.act]} ${L[st.act]} <small>${'★'.repeat(stars.reduce((a, b) => a + b, 0) ? 0 : 0)}${i + 1}/${steps.length}</small></div>
+        <p>${esc(st.text)}</p><div class="k-tags">${st.dur ? `<span class="k-tag c">⏩ ${fmtDur(st.dur)} → ${t('timeLapse')}</span>` : ''}<span class="k-tag c">💡 <b>${t('consistency')}:</b> ${esc(st.hint)}</span></div></div>`;
+      $('#kNav').innerHTML = `<button class="btn ghost" id="kSkip">${t('skip')} ⏭</button><div class="g-score" id="kScore">${'⭐'.repeat(Math.min(5, Math.round(stars.reduce((a, b) => a + b, 0) / 3)))} ${stars.reduce((a, b) => a + b, 0)} ★</div>`;
+      $('#kSkip').onclick = () => { if (cur) cur.skip(); };
+      const need = stepIngredients(st, i), sc = [];
+      if (need.length) { say('drag'); drawTray(need); sc.push(await dragGame(need)); if (gtoken !== token) return; }
+      else drawTray();
+      sc.push(await actionGame(st, need)); if (gtoken !== token) return;
+      G().innerHTML = '';
+      const avg = sc.reduce((a, b) => a + b, 0) / sc.length, s = avg >= .85 ? 3 : avg >= .6 ? 2 : 1;
+      stars.push(s);
+      showStars(s);
+      say(s === 3 ? 'great' : s === 2 ? 'good' : 'ok', null, s === 3 ? 'wink' : s === 2 ? 'happy' : 'wow');
+      SFX.play(s >= 2 ? 'success' : 'fail'); SFX.vibrate(s === 3 ? [30, 60, 30] : 20);
+      $('#kFx').innerHTML = effectHTML(st.act, st.vessel);
+      await sleep(1600); if (gtoken !== token) return;
+      playGame(i + 1);
+    }
+    function showStars(s) {
+      const d = document.createElement('div'); d.className = 'g-stars';
+      d.innerHTML = [1, 2, 3].map(k => `<span class="${k <= s ? 'on' : ''}" style="animation-delay:${k * .12}s">★</span>`).join('');
+      $('#kStage').appendChild(d); setTimeout(() => d.remove(), 1500);
+      [1, 2, 3].slice(0, s).forEach((k, j) => setTimeout(() => SFX.play('star'), 150 + j * 140));
+    }
+    function serveGame() {
+      gtoken = {}; serve();
+      const tot = stars.reduce((a, b) => a + b, 0), max = steps.length * 3, pct = tot / max, final = pct >= .85 ? 3 : pct >= .6 ? 2 : 1;
+      const res = ctx.saveScore ? ctx.saveScore(R.key || R.name, final, tot) : null;
+      chefShow('serve', 'wink'); say('done', null, 'wink');
+      SFX.play('success');
+      $('#kCard').insertAdjacentHTML('afterbegin', `<div class="g-result"><div class="g-big">${[1, 2, 3].map(k => `<span class="${k <= final ? 'on' : ''}" style="animation-delay:${k * .18}s">★</span>`).join('')}</div>
+        <b>${tot} / ${max} ★</b>${res ? `<small>${res.newBest ? '🏆 ' + t('newBest') + ' · ' : ''}${t('rank')}: ${res.rankName} · ${t('totalStars')}: ${res.total}</small>${res.next ? `<div class="g-rank"><i style="width:${res.progress}%"></i></div><small>${t('nextRank', { n: res.next })}</small>` : ''}` : ''}</div>`);
+    }
+    function startMode(m) {
+      mode = m; stars = [];
+      if (m === 'game') { $('#kStage').classList.add('game'); chefShow('idle', 'happy'); playGame(0); }
+      else { $('#kStage').classList.remove('game'); $('#kChef') && $('#kChef').classList.add('hide'); $('#kBubble') && $('#kBubble').classList.add('hide'); go(0); if (ctx.voiceAuto && !Voice.on) setTimeout(() => voiceToggle(true), 400); }
+    }
+
+    /* =================== VOICE (hands-free) =================== */
+    function voiceToggle(force) {
+      const on = force != null ? force : !Voice.on;
+      const b = $('#kVoice');
+      if (on) {
+        Voice.start(ctx.lang, cmd => {
+          if (cmd === 'stop') { voiceToggle(false); return; }
+          if (mode === 'game') { if (cmd === 'next' && cur) cur.skip(); return; }
+          if (cmd === 'next') { if (idx >= 0 && idx < steps.length) go(idx + 1); else if (idx < 0) go(0); }
+          else if (cmd === 'prev' && idx > 0) go(idx - 1);
+          else if (cmd === 'repeat') readStep();
+          else if (cmd === 'timer' && idx >= 0 && steps[idx] && steps[idx].dur) startTimer(steps[idx].dur, L[steps[idx].act]);
+        });
+        b && b.classList.add('on'); ctx.toast(t('voiceOn'));
+        if (mode === 'real') readStep(); else Voice.speak(t('voiceHelp'));
+      } else { Voice.stop(); b && b.classList.remove('on'); }
+    }
+    function readStep() {
+      if (!Voice.on) return;
+      if (idx < 0) { Voice.speak(t('chefHello', { n: R.chef ? R.chef.name : '' }) + ' ' + t('voiceHelp')); return; }
+      if (idx >= steps.length) { Voice.speak(t('bonApp')); return; }
+      const st = steps[idx]; Voice.speak(`${t('stepOf', { i: idx + 1, n: steps.length })}. ${st.text}. ${t('consistency')}: ${st.hint}`);
+    }
 
     $('#kList').onclick = () => ctx.openSheet(`<h2>🧺 ${t('ingredients')}</h2><p class="sub">${esc(R.name)}</p><ul class="ing">${items.map(x => `<li class="${x.used ? 'done' : ''}"><span class="box">✓</span><span>${x.emoji} ${esc(x.line)}</span></li>`).join('')}${sides.length ? `<li><span class="box"></span><span>🍽️ ${t('serveWith')}: ${esc(sides.join(', '))}</span></li>` : ''}</ul>`);
     intro();

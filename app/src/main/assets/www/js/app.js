@@ -204,7 +204,7 @@ function back() {
   if ($('#onboarding').classList.contains('show') && ob.i > 0) { obGo(ob.i - 1); return true; }
   return false;
 }
-window.WB = { back };
+window.WB = Object.assign(window.WB || {}, { back });
 function show(id) { $$('.screen').forEach(s => s.classList.toggle('show', s.id === id)); }
 
 /* ================= SPLASH ================= */
@@ -596,6 +596,18 @@ function recipeHTML(rc, title) {
       <button class="btn line block shop-btn" data-shop>🛒 ${t('addMissing')}</button></div>
     <div class="block" style="animation-delay:.08s"><h3>🔥 ${t('steps')} <small class="cnt">${rc.st.length}</small></h3><ol class="steps">${rc.st.map((x, i) => `<li><span class="n">${i + 1}</span><span>${esc(x)}</span></li>`).join('')}</ol></div>`;
 }
+function saveScore(key, final, earned) {
+  const g = store.get('gstats', { total: 0, best: {}, games: 0 });
+  const newBest = !g.best[key] || final > g.best[key];
+  if (newBest) g.best[key] = final;
+  g.total += earned; g.games++; store.set('gstats', g);
+  return Object.assign({ newBest }, rankInfo(g.total));
+}
+function rankInfo(total) {
+  let i = 0; CHEF_RANKS.forEach((r, k) => { if (total >= r[0]) i = k; });
+  const nx = CHEF_RANKS[i + 1];
+  return { total, rankName: t(CHEF_RANKS[i][1]), next: nx ? t(nx[1]) : '', progress: nx ? Math.round((total - CHEF_RANKS[i][0]) / (nx[0] - CHEF_RANKS[i][0]) * 100) : 100 };
+}
 function dietHTML(d) {
   const prefs = store.get('diet', []), ok = DIETS.filter(k => d[k]), bad = prefs.filter(k => !d[k]);
   if (!ok.length && !bad.length) return '';
@@ -606,8 +618,8 @@ function openKitchen(rc, name, extra) {
   const w = extra.wiki ? wikiCached(extra.wiki, 'en') : null;
   const local = extra.key && typeof LOCAL_PHOTOS !== 'undefined' && LOCAL_PHOTOS[extra.key];
   const chefId = currentChef(extra.code), ch = CHEFS[chefId];
-  Kitchen.open({ chef: { id: chefId, name: ch.name[lang] || ch.name.tr }, name, country: extra.country || '', emoji: extra.emoji || '🍽️', img: local || (w && (w.big || w.img)) || null, ing: rc.ing.map(l => scaleLine(l, (rc.cur || rc.s) / rc.s)), st: rc.st, servings: rc.cur || rc.s, time: fmtTime(rc.t), nutri: rc.n || estimateNutrition(rc.ing, rc.s, rc.key) },
-    { t, esc, lang, pushPage, back, keepAwake, openSheet, toast });
+  Kitchen.open({ key: rc.key || name, chef: { id: chefId, name: ch.name[lang] || ch.name.tr }, name, country: extra.country || '', emoji: extra.emoji || '🍽️', img: local || (w && (w.big || w.img)) || null, ing: rc.ing.map(l => scaleLine(l, (rc.cur || rc.s) / rc.s)), st: rc.st, servings: rc.cur || rc.s, time: fmtTime(rc.t), nutri: rc.n || estimateNutrition(rc.ing, rc.s, rc.key) },
+    { t, esc, lang, pushPage, back, keepAwake, openSheet, toast, saveScore, voiceAuto: store.get('voiceAuto', false) });
 }
 function bindRecipe(el, rc, name, extra) {
   const upd = () => { const all = $$('.ing li,.steps li', el), d = all.filter(x => x.classList.contains('done')); $$('.rProg', el).forEach(p => p.style.width = (d.length / all.length * 100) + '%'); };
@@ -1243,6 +1255,9 @@ function renderSettings() {
     <div class="group"><h4>👩‍🍳 ${t('chefTitle')}</h4>
       <div class="chef-pick">${Object.values(CHEFS).map(ch => `<button class="chef-card ${currentChef() === ch.id ? 'on' : ''}" data-chef="${ch.id}">${chefSVG(ch.id, currentChef() === ch.id ? 'wink' : 'happy')}<b>${esc(ch.name[lang] || ch.name.tr)}</b><small>${esc(ch.tag[lang] || ch.tag.tr)}</small></button>`).join('')}</div>
       <div class="chips" style="padding:0 16px 8px;margin:0">${['age', 'dish', 'random'].map(m => `<button class="chip ${store.get('chefMode', 'age') === m ? 'on' : ''}" data-cm="${m}">${t('chef_' + m)}</button>`).join('')}</div>
+      ${(g => `<div class="rank-card"><span>🏅</span><div><b>${rankInfo(g.total).rankName}</b><small>${g.total} ★ · ${g.games} ${t('gamesPlayed')}</small><div class="g-rank"><i style="width:${rankInfo(g.total).progress}%"></i></div></div></div>`)(store.get('gstats', { total: 0, games: 0 }))}
+      <div class="row" id="sSfx"><span class="ri">🔊</span><span class="lbl">${t('sfxToggle')}</span><span class="toggle ${store.get('sfx', true) ? 'on' : ''}" style="flex:none"></span></div>
+      <div class="row" id="sVoiceAuto"><span class="ri">🎙️</span><span class="lbl">${t('voiceAuto')}</span><span class="toggle ${store.get('voiceAuto', false) ? 'on' : ''}" style="flex:none"></span></div>
       <button class="row" id="sAge"><span class="ri">🎂</span><span class="lbl">${t('age')}</span><small>${s.age || '—'}</small>${I.chev}</button></div>
     <div class="group"><h4>🥗 ${t('dietTitle')}</h4><div class="chips" style="padding:6px 16px 4px;margin:0;flex-wrap:wrap">${DIETS.map(k => `<button class="chip ${store.get('diet', []).includes(k) ? 'on' : ''}" data-sd="${k}">${DIET_ICON[k]} ${t('diet_' + k)}</button>`).join('')}</div><p class="credits" style="padding-top:8px">${t('dietNote')}</p></div>
     <div class="group"><h4>${t('themeColor')}</h4><div class="swatches">${SWATCHES.map(c => `<button class="sw ${c.toLowerCase() === color.toLowerCase() ? 'on' : ''}" data-c="${c}" style="background:${c}"></button>`).join('')}
@@ -1260,10 +1275,12 @@ function renderSettings() {
       <button class="row" id="sIntro"><span class="ri">${I.replay}</span><span class="lbl">${t('replayIntro')}</span>${I.chev}</button>
       <button class="row" id="sCache"><span class="ri">${I.trash}</span><span class="lbl">${t('clearCache')}</span>${I.chev}</button>
       <button class="row danger" id="sOut"><span class="ri">${I.logout}</span><span class="lbl">${t('logout')}</span></button></div>
-    <div class="group"><h4>${t('about2')}</h4><div class="row"><span class="ri">${I.info}</span><span class="lbl">World Bite</span><small>${t('version')} 1.4.0</small></div><p class="credits">${t('credits')}</p></div>`;
+    <div class="group"><h4>${t('about2')}</h4><div class="row"><span class="ri">${I.info}</span><span class="lbl">World Bite</span><small>${t('version')} 1.5.0</small></div><p class="credits">${t('credits')}</p></div>`;
   $$('[data-chef]').forEach(b => b.onclick = () => { store.set('chefMode', b.dataset.chef); renderSettings(); });
   $$('[data-cm]').forEach(b => b.onclick = () => { store.set('chefMode', b.dataset.cm); renderSettings(); });
   $('#sAge').onclick = () => askAge(true);
+  $('#sSfx').onclick = () => { store.set('sfx', !store.get('sfx', true)); renderSettings(); SFX.play('ding'); };
+  $('#sVoiceAuto').onclick = () => { store.set('voiceAuto', !store.get('voiceAuto', false)); renderSettings(); };
   $$('[data-sd]').forEach(b => b.onclick = () => { toggleDiet(b.dataset.sd); b.classList.toggle('on'); drawChips && $('#dietChips') && (drawChips(), drawGrid()); });
   $$('.sw[data-c]').forEach(b => b.onclick = () => { store.set('color', b.dataset.c); applyTheme(); renderSettings(); });
   $('#cc').oninput = e => { store.set('color', e.target.value); applyTheme(); };
