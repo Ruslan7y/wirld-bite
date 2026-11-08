@@ -16,7 +16,10 @@
 | Giriş | Giriş yap / Hesap oluştur · Gmail · Facebook · e-posta (demo: bilgiler cihazda saklanır) |
 | Keşfet | Arama, günlük/haftalık popüler yemekler, adım adım tarifler, 196 ülke, kategori ve kıta filtresi |
 | Ülke sayfası | İmza yemek, fotoğraf, güçlü olduğu alan (kahvaltı / ana yemek / ara sıcak / tatlı), hikaye, açıklama |
-| Seyahat | Bulunduğun şehirde veya gideceğin ülkede restoranlar — uygulama içinde liste + harita; web sitesi varsa oraya yönlendirir |
+| Seyahat | Önce konum izni; yakındaki restoranlar uygulama içinde liste + vektör harita (MapLibre/OpenFreeMap). Gemini anahtarı varsa Google Haritalar puan ve yorumlarıyla. Tüm aramalar telefonda saklanır |
+| Mutfak animasyonu | Her tarif için: malzemeler kaba uçar ve listeden çıkar, yumurta kırma, çırpma, doğrama, kızartma, kaynatma, fırın; kıvam bilgisi, süre ve zamanlayıcı, atla, servis sunumu, kamerada "masada gör" |
+| Elimdekiler | Eldeki malzemelerle yapılabilecek tarifler (% eşleşme, eksikler) + Gemini ile özel tarif |
+| Besin değerleri | Tüm yemeklerde porsiyon başına kcal, protein, karbonhidrat, yağ (malzemelerden tahmini) |
 | Listem | Kaydedilen tarifler/yemekler ve restoranlar ayrı ayrı |
 | Ayarlar | Tema rengi (8 hazır + özel renk), koyu mod, dil (TR / AZ / EN / RU), çıkış |
 
@@ -41,6 +44,10 @@ app/src/main/assets/www/   → uygulamanın arayüzü (HTML/CSS/JS)
 app/src/main/java/...      → Android WebView kabuğu
 .github/workflows/         → APK derleme
 ```
+
+## Gemini (isteğe bağlı)
+
+Uygulamada **Ayarlar → Gemini** bölümüne [Google AI Studio](https://aistudio.google.com/apikey) anahtarını gir. Anahtar yalnızca telefonda saklanır; APK'nın içine gömülmez.
 
 ## Veri kaynakları
 

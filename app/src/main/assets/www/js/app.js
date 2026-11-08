@@ -41,6 +41,7 @@ const I = {
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>',
   logout: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 4h4v16h-4M10 17l5-5-5-5M15 12H3"/></svg>',
   share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>',
+  pantry: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h18l-2 10H5z"/><path d="m8 10 3-6M16 10l-3-6"/><path d="M9 14v3M15 14v3M12 14v3"/></svg>',
   info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>',
   google: '<svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>',
   facebook: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#1877F2"/><path fill="#fff" d="M13.4 21v-7h2.4l.4-2.8h-2.8V9.4c0-.8.2-1.4 1.4-1.4h1.5V5.5c-.3 0-1.1-.1-2.2-.1-2.2 0-3.6 1.3-3.6 3.7v2.1H8.1V14h2.4v7z"/></svg>'
@@ -328,12 +329,12 @@ function socialAuth(p) {
 function login(u) { store.set('session', { name: u.name, email: u.email, provider: u.provider }); enterApp(); }
 
 /* ================= MAIN APP ================= */
-const TABS = ['explore', 'travel', 'list', 'settings'];
+const TABS = ['explore', 'travel', 'pantry', 'list', 'settings'];
 function enterApp() {
   $('#tabbar').innerHTML = TABS.map(k => `<button data-tab="${k}">${I[k]}<span>${t('tab' + k[0].toUpperCase() + k.slice(1))}</span></button>`).join('');
   $$('#tabbar button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
   show('main');
-  renderExplore(); renderTravel(); renderList(); renderSettings();
+  renderExplore(); renderTravel(); renderPantry(); renderList(); renderSettings();
   setTab(state.tab);
 }
 function setTab(k) {
@@ -341,7 +342,8 @@ function setTab(k) {
   $$('#tabbar button').forEach(b => b.classList.toggle('on', b.dataset.tab === k));
   $$('.view').forEach(v => v.classList.toggle('on', v.id === 'v-' + k));
   if (k === 'list') renderList();
-  if (k === 'travel' && map) setTimeout(() => map.invalidateSize(), 60);
+  if (k === 'travel' && map) setTimeout(mapResize, 60);
+  if (k === 'pantry') renderPantry();
   const v = $('#v-' + k); hydrate(v); requestAnimationFrame(() => $$('.seg', v).forEach(moveKnob));
 }
 const session = () => store.get('session', { name: '?' });
@@ -374,7 +376,7 @@ function renderExplore() {
 function countryCard(c, i) {
   return `<div class="ccard" role="button" data-open="c:${c.code}" style="animation-delay:${Math.min(i, 12) * 0.03}s">
     ${photo(c.code, c.wiki, c.emoji)}<span class="flag">${flag(c.code)}</span>${heartBtn('dishes', c.code)}
-    <div class="b"><h3>${esc(cname(c.code))}</h3><p>${esc(dishName(c))}</p><div class="badges"><span class="badge">★ ${t(c.strength)}</span><span class="badge soft">⏱ ${fmtTime(sigOf(c.code).t)}</span></div></div></div>`;
+    <div class="b"><h3>${esc(cname(c.code))}</h3><p>${esc(dishName(c))}</p><div class="badges"><span class="badge">★ ${t(c.strength)}</span><span class="badge soft">🔥 ${kcalOf(c.code)}</span></div></div></div>`;
 }
 function recipeCard(r, i) {
   return `<button class="rcard" data-open="r:${r.id}" style="animation-delay:${i * 0.04}s">${photo(r.id, r.wiki, r.e)}
@@ -384,7 +386,7 @@ function renderDotd() {
   const d = new Date(), idx = hash(d.toISOString().slice(0, 10) + 'dotd') % COUNTRIES.length, c = COUNTRIES[idx], rc = sigOf(c.code);
   $('#dotd').innerHTML = `<div class="dotd" role="button" data-open="c:${c.code}">${photo(c.code, c.wiki, c.emoji, true)}
     <div class="dotd-shade"></div><span class="dotd-tag">✨ ${t('dishOfDay')}</span>${heartBtn('dishes', c.code)}
-    <div class="dotd-b"><small>${flag(c.code)} ${esc(cname(c.code))}</small><h2>${esc(dishName(c))}</h2><span>⏱ ${fmtTime(rc.t)} · 📊 ${t(rc.d)} · ${t(c.cat)}</span></div></div>`;
+    <div class="dotd-b"><small>${flag(c.code)} ${esc(cname(c.code))}</small><h2>${esc(dishName(c))}</h2><span>⏱ ${fmtTime(rc.t)} · 🔥 ${kcalOf(c.code)} kcal · 📊 ${t(rc.d)}</span></div></div>`;
   hydrate($('#dotd'));
 }
 function renderPopular() {
@@ -430,22 +432,44 @@ document.addEventListener('click', e => {
 });
 
 /* ---------- Recipes: shared helpers ---------- */
+function kcalOf(code) { const rc = sigOf(code); return rc ? estimateNutrition(rc.ing, rc.s, 'c' + code).kcal : '?'; }
 function sigOf(code) {
   if (code === 'AZ') { const r = recipeById['az-main'], l = cl(); return { t: r.t, s: r.s, d: r.d, ing: r.ing[l], st: r.st[l], tr: false }; }
   const g = SIG[code]; return g ? Object.assign({ tr: true }, g) : null;
 }
+function nutriHTML(n, ai) {
+  const tot = n.protein * 4 + n.carbs * 4 + n.fat * 9 || 1, pct = v => Math.round(v / tot * 100), day = Math.round(n.kcal / 2000 * 100);
+  const C = 2 * Math.PI * 34, seg = (v, off, col) => `<circle cx="40" cy="40" r="34" stroke="${col}" stroke-dasharray="${C * v / 100} ${C}" stroke-dashoffset="${-C * off / 100}"/>`;
+  const pP = pct(n.protein * 4), pC = pct(n.carbs * 4), pF = 100 - pP - pC;
+  return `<div class="block nutri"><h3>🔥 ${t('nutrition')} <small class="cnt">${t('perServing')}</small></h3>
+    <div class="nrow"><div class="nring"><svg viewBox="0 0 80 80">${seg(pP, 0, '#3B82F6')}${seg(pC, pP, '#F59E0B')}${seg(pF, pP + pC, '#EF4444')}</svg><div><b>${n.kcal}</b><small>kcal</small></div></div>
+      <div class="nbars">
+        <div><span>🥩 ${t('protein')}</span><b>${n.protein} g</b><i style="--w:${pP}%;--c:#3B82F6"></i></div>
+        <div><span>🍞 ${t('carbs')}</span><b>${n.carbs} g</b><i style="--w:${pC}%;--c:#F59E0B"></i></div>
+        <div><span>🧈 ${t('fat')}</span><b>${n.fat} g</b><i style="--w:${pF}%;--c:#EF4444"></i></div>
+        ${n.fiber != null ? `<div><span>🌾 ${t('fiber')}</span><b>${Math.round(n.fiber)} g</b></div>` : ''}</div></div>
+    <p class="note">⚡ ${t('kcalDaily', { p: day })} · ${ai ? t('aiEstimate') : t('estimate')}</p></div>`;
+}
 function recipeHTML(rc, title) {
-  return `<div class="info-row" style="margin-top:14px"><span class="pill p">⏱ ${fmtTime(rc.t)}</span><span class="pill">👥 ${rc.s} ${t('servings')}</span><span class="pill">📊 ${t(rc.d)}</span></div>
+  const n = rc.n || estimateNutrition(rc.ing, rc.s, rc.key);
+  return nutriHTML(n, rc.ai) + `<div class="info-row" style="margin-top:14px"><span class="pill p">⏱ ${fmtTime(rc.t)}</span><span class="pill">👥 ${rc.s} ${t('servings')}</span><span class="pill">📊 ${t(rc.d)}</span></div>
     ${rc.tr && (lang === 'en' || lang === 'ru') ? `<p class="note">${t('sigLangNote')}</p>` : ''}
     <button class="btn primary block cook-btn" data-cook>👩‍🍳 ${t('startCooking')}</button>
     <div class="prog"><i class="rProg"></i></div>
     <div class="block"><h3>🧺 ${t('ingredients')} <small class="cnt">${rc.ing.length}</small></h3><ul class="ing">${rc.ing.map(x => `<li><span class="box">✓</span><span>${esc(x)}</span></li>`).join('')}</ul><p class="note">👆 ${t('tapHint')}</p></div>
     <div class="block" style="animation-delay:.08s"><h3>🔥 ${t('steps')} <small class="cnt">${rc.st.length}</small></h3><ol class="steps">${rc.st.map((x, i) => `<li><span class="n">${i + 1}</span><span>${esc(x)}</span></li>`).join('')}</ol></div>`;
 }
-function bindRecipe(el, rc, name) {
+function openKitchen(rc, name, extra) {
+  extra = extra || {};
+  const w = extra.wiki ? wikiCached(extra.wiki, 'en') : null;
+  const local = extra.key && typeof LOCAL_PHOTOS !== 'undefined' && LOCAL_PHOTOS[extra.key];
+  Kitchen.open({ name, country: extra.country || '', emoji: extra.emoji || '🍽️', img: local || (w && (w.big || w.img)) || null, ing: rc.ing, st: rc.st, servings: rc.s, time: fmtTime(rc.t), nutri: rc.n || estimateNutrition(rc.ing, rc.s, rc.key) },
+    { t, esc, lang, pushPage, back, keepAwake, openSheet, toast });
+}
+function bindRecipe(el, rc, name, extra) {
   const upd = () => { const all = $$('.ing li,.steps li', el), d = all.filter(x => x.classList.contains('done')); $$('.rProg', el).forEach(p => p.style.width = (d.length / all.length * 100) + '%'); };
   $$('.ing li,.steps li', el).forEach(li => li.onclick = () => { li.classList.toggle('done'); upd(); });
-  $$('[data-cook]', el).forEach(b => b.onclick = () => cookMode(rc, name));
+  $$('[data-cook]', el).forEach(b => b.onclick = () => openKitchen(rc, name, extra));
 }
 function fmtTime(m) {
   if (m >= 1440) return Math.round(m / 1440) + ' ' + t('days');
@@ -510,7 +534,7 @@ function openCountry(code) {
       ${others.length ? `<div class="sec"><h2>👩‍🍳 ${t('moreRecipes')}</h2><small>${others.length}</small></div><div class="hscroll">${others.map(recipeCard).join('')}</div>` : ''}
       <button class="btn primary block cta" id="goEat">📍 ${t('whereEat')}</button>
     </div>`, el => {
-    if (sig) bindRecipe(el, sig, dishName(c));
+    if (sig) { sig.key = 'c' + code; bindRecipe(el, sig, dishName(c), { emoji: c.emoji, country: flag(c.code) + ' ' + cname(c.code), wiki: c.wiki, key: c.code }); }
     $('#shareBtn', el).onclick = () => sig ? shareRecipe(dishName(c), cname(c.code), sig) : share(dishName(c), c.story);
     $('#goEat', el).onclick = () => { state.tmode = 'near'; state.cuisine = code; state.trip = code; while (stack.length) back(); setTab('travel'); renderTravel(); };
     wikiGet(c.wiki, lang).then(w => {
@@ -539,41 +563,65 @@ function openRecipe(id) {
       ${recipeHTML(rc)}
       <button class="btn ghost block cta" id="goEat">📍 ${t('whereEat')}</button>
     </div>`, el => {
-    bindRecipe(el, rc, recName(r));
+    rc.key = 'r' + r.id; bindRecipe(el, rc, recName(r), { emoji: r.e, country: flag(r.country) + ' ' + cname(r.country), wiki: r.wiki, key: r.id });
     $('#shareBtn', el).onclick = () => shareRecipe(recName(r), cname(r.country), rc);
     $('#goEat', el).onclick = () => { state.tmode = 'near'; state.cuisine = r.country; state.trip = r.country; while (stack.length) back(); setTab('travel'); renderTravel(); };
   });
 }
 
-/* ---------- TRAVEL: restaurants inside the app (OpenStreetMap) ---------- */
-let map = null, markers = null;
+/* ---------- TRAVEL: location first, fast search, vector map, Gemini + Google Maps ---------- */
+let map = null, mapKind = '', mapMarkers = [];
+const LOC_TTL = 30 * 60e3, CACHE_TTL = 3 * 864e5;
+function mapResize() { try { mapKind === 'gl' ? map.resize() : map && map.invalidateSize(); } catch (e) {} }
+const gemKey = () => (store.get('gemKey', '') || '').trim();
+const gemModel = () => (store.get('gemModel', '') || '').trim() || 'gemini-flash-latest';
+function ago(ts) { const m = Math.round((Date.now() - ts) / 6e4); return m < 1 ? t('justNow') : m < 60 ? t('minAgo', { n: m }) : m < 1440 ? t('hrAgo', { n: Math.round(m / 60) }) : t('dayAgo', { n: Math.round(m / 1440) }); }
+
 function renderTravel() {
   const near = state.tmode === 'near';
   const cc = near ? state.cuisine : state.trip, c = cc && byCode[cc];
+  if (!state.coords) { const l = store.get('lastLoc', null); if (l && Date.now() - l.ts < 7 * 864e5) state.coords = { lat: l.lat, lon: l.lon }; }
+  const hasLoc = !!state.coords || !!state.city.trim();
+  const recent = store.get('recent', []);
+  const src = gemKey() ? `<span class="src g">⭐ ${t('sourceGoogle')}</span>` : `<span class="src">🗺️ ${t('sourceOsm')}</span>`;
   $('#v-travel').innerHTML = `
-    <div class="top"><div><div class="hi">✈️ World Bite</div><h1>${t('travelTitle')}</h1></div></div>
+    <div class="top"><div><div class="hi">✈️ World Bite</div><h1>${t('travelTitle')}</h1></div>${src}</div>
     <div class="seg mode" id="tSeg"><span class="knob"></span><button data-m="near">📍 ${t('nearMe')}</button><button data-m="trip">✈️ ${t('tripTo')}</button></div>
-    <p class="hint">${near ? t('nearHint') : t('travelHint')}</p>
-    ${near ? `<div class="trow"><label class="search">${I.search}<input id="tCity" placeholder="${t('searchCity')}" value="${esc(state.coords ? '📍 ' + t('nearMe') : state.city)}" autocomplete="off"></label><button class="icon-btn" id="tLoc" title="${t('useLocation')}">${I.locate}</button></div>` : ''}
+    ${near && !hasLoc && !state.cityMode ? `
+      <div class="loc-card"><div class="loc-pulse"><span>📍</span></div><h2>${t('locTitle')}</h2><p>${t('locText')}</p>
+        <button class="btn primary block" id="tLocBig">📍 ${t('locBtn')}</button><button class="link" id="tCityMode">${t('orCity')}</button></div>` : `
+    ${near ? `<div class="trow">
+        ${state.coords && !state.cityMode ? `<button class="loc-pill" id="tLocPill">📍 <b>${t('myLocation')}</b><small>${t('change')}</small></button>`
+        : `<label class="search">${I.search}<input id="tCity" placeholder="${t('searchCity')}" value="${esc(state.city)}" autocomplete="off"></label>`}
+        <button class="icon-btn" id="tLoc" title="${t('useLocation')}">${I.locate}</button></div>` : ''}
     <button class="select" id="tPick" style="margin-top:10px"><span>${c ? flag(c.code) + ' ' + esc(cname(c.code)) : (near ? '🍽️ ' + t('anyCuisine') : '🌍 ' + t('chooseCountry'))}</span><small>${near ? t('cuisine') : ''}</small>${I.chev}</button>
-    <button class="btn primary block" id="tFind" style="margin-top:12px">${I.search.replace('<svg', '<svg width="20" height="20"')}${t('find')}</button>
+    <button class="btn primary block" id="tFind" style="margin-top:12px">${I.search.replace('<svg', '<svg width="20" height="20"')}${t('find')}</button>`}
+    ${!gemKey() ? `<p class="hint small">💡 ${t('addKeyHint')}</p>` : ''}
+    ${recent.length ? `<div class="chips recent" style="margin-top:12px">${recent.slice(0, 8).map((r, i) => `<button class="chip" data-rc="${i}">🕘 ${esc(r.label)}</button>`).join('')}</div>` : ''}
     <div id="tStatus"></div>
-    <div id="map" class="${state.results.length ? '' : 'hide'}"></div>
+    <div class="map-wrap ${state.results.length ? '' : 'hide'}" id="mapWrap"><div id="map"></div>
+      <div class="map-btns"><button class="round" id="mFull">⤢</button><button class="round" id="mMe">${I.locate}</button></div></div>
     <div id="tRes"></div>`;
   const seg = $('#tSeg');
   $$('button', seg).forEach(b => { b.classList.toggle('on', b.dataset.m === state.tmode); b.onclick = () => { state.tmode = b.dataset.m; state.results = []; renderTravel(); }; });
-  requestAnimationFrame(() => moveKnob(seg));
-  if (near) {
-    const ci = $('#tCity');
-    ci.onfocus = () => { if (state.coords) { state.coords = null; ci.value = state.city; } };
+  const big = $('#tLocBig'); if (big) big.onclick = useLocation;
+  const cm = $('#tCityMode'); if (cm) cm.onclick = () => { state.cityMode = true; renderTravel(); setTimeout(() => $('#tCity') && $('#tCity').focus(), 50); };
+  const pill = $('#tLocPill'); if (pill) pill.onclick = () => { state.cityMode = true; renderTravel(); setTimeout(() => $('#tCity') && $('#tCity').focus(), 50); };
+  const ci = $('#tCity');
+  if (ci) {
     ci.oninput = () => { state.city = ci.value; store.set('city', state.city); };
-    ci.onkeydown = e => { if (e.key === 'Enter') { ci.blur(); findRestaurants(); } };
-    $('#tLoc').onclick = useLocation;
+    ci.onkeydown = e => { if (e.key === 'Enter') { ci.blur(); state.coords = null; findRestaurants(); } };
   }
-  $('#tPick').onclick = () => pickCountry(near, code => { near ? (state.cuisine = code) : (state.trip = code); state.results = []; renderTravel(); });
-  $('#tFind').onclick = () => findRestaurants();
+  const loc = $('#tLoc'); if (loc) loc.onclick = () => { state.cityMode = false; useLocation(); };
+  const pk = $('#tPick'); if (pk) pk.onclick = () => pickCountry(near, code => { near ? (state.cuisine = code) : (state.trip = code); state.results = []; renderTravel(); findRestaurants(); });
+  const fd = $('#tFind'); if (fd) fd.onclick = () => { if (near && state.cityMode && state.city.trim()) state.coords = null; findRestaurants(); };
+  $$('[data-rc]').forEach(b => b.onclick = () => { const r = recent[+b.dataset.rc]; const hit = store.get('rc:' + r.key, null); if (hit) { state.results = hit.list; state.resLabel = r.label; state.center = hit.center; state.src = hit.src; renderTravel(); setStatus(`🕘 ${esc(r.label)} · ${t('cachedAgo', { t: ago(hit.ts) })}`); } });
+  $('#mFull').onclick = () => { $('#mapWrap').classList.toggle('full'); setTimeout(mapResize, 320); };
+  $('#mMe').onclick = () => { const p = state.center; if (!p || !map) return; mapKind === 'gl' ? map.flyTo({ center: [p.lon, p.lat], zoom: 14 }) : map.setView([p.lat, p.lon], 14); };
   map = null;
   if (state.results.length) drawResults(state.results, state.resLabel, state.center);
+  // location first: if we already have a recent location and nothing on screen, search right away
+  if (near && state.coords && !state.results.length && !state.autoSearched) { state.autoSearched = true; findRestaurants(); }
 }
 function pickCountry(allowAny, cb) {
   const list = COUNTRIES.slice().sort((a, b) => cname(a.code).localeCompare(cname(b.code), lang));
@@ -594,24 +642,39 @@ function setStatus(html) { const s = $('#tStatus'); if (s) s.innerHTML = html ? 
 function useLocation() {
   if (!navigator.geolocation) return toast(t('locErr'));
   setStatus(`<span class="spinner"></span>${t('locating')}`);
-  navigator.geolocation.getCurrentPosition(p => {
-    state.coords = { lat: p.coords.latitude, lon: p.coords.longitude };
-    const ci = $('#tCity'); if (ci) ci.value = '📍 ' + t('nearMe');
-    findRestaurants();
-  }, () => { setStatus(''); toast(t('locErr')); }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 600000 });
+  const ok = p => {
+    state.coords = { lat: p.coords.latitude, lon: p.coords.longitude }; state.cityMode = false;
+    store.set('lastLoc', { lat: state.coords.lat, lon: state.coords.lon, ts: Date.now() });
+    state.results = []; state.autoSearched = true; renderTravel(); findRestaurants();
+  };
+  // fast coarse fix first (cached up to 10 min), precise only if needed
+  navigator.geolocation.getCurrentPosition(ok, () => navigator.geolocation.getCurrentPosition(ok, () => { setStatus(''); toast(t('locErr')); state.cityMode = true; renderTravel(); }, { enableHighAccuracy: true, timeout: 15000 }), { enableHighAccuracy: false, timeout: 6000, maximumAge: 600000 });
+}
+
+/* fastest-wins helpers */
+function raceFetch(urls, opts, parse, ms = 12000) {
+  const ctrls = urls.map(() => new AbortController());
+  const timer = setTimeout(() => ctrls.forEach(c => c.abort()), ms);
+  return Promise.any(urls.map((u, i) => fetch(u, Object.assign({ signal: ctrls[i].signal }, opts)).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(parse).then(v => { ctrls.forEach((c, j) => j !== i && c.abort()); return v; })))
+    .finally(() => clearTimeout(timer));
 }
 async function geocode(q, cc) {
-  const u = `https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=${lang}${cc ? '&countrycodes=' + cc.toLowerCase() : ''}&q=${encodeURIComponent(q)}`;
-  const r = await fetch(u).then(r => r.json());
-  if (!r.length) throw new Error('nf');
-  return { lat: +r[0].lat, lon: +r[0].lon, name: r[0].display_name.split(',')[0] };
+  const key = 'geo:' + (cc || '') + ':' + norm(q), hit = store.get(key, null);
+  if (hit) return hit;
+  const res = await raceFetch([
+    `https://photon.komoot.io/api/?limit=1&q=${encodeURIComponent(q + (cc ? ' ' + cname(cc) : ''))}`,
+    `https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=${lang}${cc ? '&countrycodes=' + cc.toLowerCase() : ''}&q=${encodeURIComponent(q)}`
+  ], {}, j => {
+    if (Array.isArray(j)) { if (!j.length) throw 0; return { lat: +j[0].lat, lon: +j[0].lon, name: j[0].display_name.split(',')[0] }; }
+    const f = j.features && j.features[0]; if (!f) throw 0; return { lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0], name: f.properties.name };
+  }, 9000);
+  store.set(key, res); return res;
 }
-async function overpass(lat, lon, radius, cuisine) {
+const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
+function overpass(lat, lon, radius, cuisine) {
   const f = cuisine ? `["cuisine"~"${cuisine}",i]` : '';
-  const q = `[out:json][timeout:25];nwr["amenity"="restaurant"]["name"]${f}(around:${radius},${lat},${lon});out center tags 120;`;
-  const r = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
-  if (!r.ok) throw new Error('op');
-  return (await r.json()).elements;
+  const q = `[out:json][timeout:12];(node["amenity"="restaurant"]["name"]${f}(around:${radius},${lat},${lon});way["amenity"="restaurant"]["name"]${f}(around:${radius},${lat},${lon}););out center tags qt 80;`;
+  return raceFetch(OVERPASS, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }, j => j.elements, 14000);
 }
 function dist(a, b) { const R = 6371, dLa = (b.lat - a.lat) * Math.PI / 180, dLo = (b.lon - a.lon) * Math.PI / 180; const x = Math.sin(dLa / 2) ** 2 + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * Math.sin(dLo / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(x)); }
 function toRest(el, center, localTag) {
@@ -621,94 +684,282 @@ function toRest(el, center, localTag) {
   const cuisine = (g.cuisine || '').replace(/_/g, ' ').split(';').map(s => s.trim()).filter(Boolean);
   const local = !!localTag && (cuisine.some(x => x.includes(localTag.replace(/_/g, ' '))) || cuisine.some(x => /regional|local|traditional/.test(x)));
   const addr = [[g['addr:street'], g['addr:housenumber']].filter(Boolean).join(' '), g['addr:city']].filter(Boolean).join(', ');
-  return { id: el.type[0] + el.id, name: g.name, lat, lon, cuisine, web, phone: g.phone || g['contact:phone'] || '', hours: g.opening_hours || '', addr, local, km: center ? dist(center, { lat, lon }) : 0 };
+  return { id: el.type[0] + el.id, name: g.name, lat, lon, cuisine, web, phone: g.phone || g['contact:phone'] || '', hours: g.opening_hours || '', addr, local, km: center ? dist(center, { lat, lon }) : 0, src: 'osm' };
 }
+
+/* Gemini + Grounding with Google Maps: top-rated places with ratings, reviews, price */
+const LANG_NAME = { tr: 'Turkish', az: 'Azerbaijani', en: 'English', ru: 'Russian' };
+async function gemini(body, ms = 30000) {
+  const ctrl = new AbortController(), tm = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(gemModel())}:generateContent`, { method: 'POST', signal: ctrl.signal, headers: { 'Content-Type': 'application/json', 'x-goog-api-key': gemKey() }, body: JSON.stringify(body) });
+    const j = await r.json();
+    if (!r.ok) throw new Error((j.error && j.error.message) || r.status);
+    return j;
+  } finally { clearTimeout(tm); }
+}
+const gemText = j => ((j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || []).map(p => p.text || '').join('');
+function gemJSON(txt) { const m = txt.match(/```(?:json)?\s*([\s\S]*?)```/); const s = (m ? m[1] : txt).trim(); const a = s.indexOf('['), o = s.indexOf('{'); const start = a >= 0 && (o < 0 || a < o) ? a : o; const end = Math.max(s.lastIndexOf(']'), s.lastIndexOf('}')); return JSON.parse(s.slice(start, end + 1)); }
+async function geminiPlaces(center, cuisineName, placeLabel) {
+  const what = cuisineName ? `restaurants serving ${cuisineName} cuisine` : 'restaurants with great local/traditional food';
+  const where = center ? 'near my current location' : `in ${placeLabel}`;
+  const prompt = `Using Google Maps, find the 10 best-rated ${what} ${where}. Reply ONLY with a JSON array (no prose, no markdown). Each item: {"name":string,"rating":number|null,"reviews":number|null,"price":string|null,"address":string,"lat":number,"lng":number,"website":string|null,"phone":string|null,"open_now":boolean|null,"summary":string}. "summary" = one short sentence in ${LANG_NAME[lang]} about why it is good. Sort by rating, highest first.`;
+  const body = { contents: [{ role: 'user', parts: [{ text: prompt }] }], tools: [{ googleMaps: {} }] };
+  if (center) body.toolConfig = { retrievalConfig: { latLng: { latitude: center.lat, longitude: center.lon }, languageCode: lang } };
+  const j = await gemini(body);
+  const arr = gemJSON(gemText(j));
+  const chunks = ((j.candidates[0].groundingMetadata || {}).groundingChunks || []).map(c => c.maps).filter(Boolean);
+  return arr.filter(x => x && x.name).map((x, i) => {
+    const ch = chunks.find(c => c.title && (norm(c.title).includes(norm(x.name)) || norm(x.name).includes(norm(c.title))));
+    let web = x.website || ''; if (web && !/^https?:\/\//i.test(web)) web = 'https://' + web;
+    const lat = +x.lat || null, lon = +x.lng || +x.lon || null;
+    return { id: 'g' + hash(x.name + (x.address || '')), name: x.name, lat, lon, cuisine: cuisineName ? [cuisineName] : [], web, phone: x.phone || '', hours: '', addr: x.address || '', rating: x.rating, reviews: x.reviews, price: x.price, open: x.open_now, summary: x.summary || '', maps: ch ? ch.uri : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(x.name + ' ' + (x.address || ''))}`, local: true, km: center && lat ? dist(center, { lat, lon }) : 0, src: 'google' };
+  });
+}
+
 async function findRestaurants(all) {
   const near = state.tmode === 'near';
   const cc = near ? state.cuisine : state.trip, c = cc && byCode[cc];
   if (!near && !c) return pickCountry(false, code => { state.trip = code; renderTravel(); findRestaurants(); });
-  setStatus(`<span class="spinner"></span>${t('searching')}`);
+  if (near && !state.coords && !state.city.trim()) { useLocation(); return; }
+  const useG = !!gemKey() && !all;
+  setStatus(`<span class="spinner"></span>${useG ? t('searchingG') : t('searching')}`);
+  $('#tRes').innerHTML = Array.from({ length: 4 }, () => `<div class="rest skel"><div class="ico"></div><div class="b"><div class="sk"></div><div class="sk" style="width:60%"></div></div></div>`).join('');
   try {
-    let center;
+    let center, label;
     if (near) {
-      if (state.coords) center = state.coords;
-      else { if (!state.city.trim()) { setStatus(''); $('#tCity').focus(); return; } center = await geocode(state.city); }
-    } else center = await geocode(c.city, c.code);
-    let els, label;
-    if (near) {
-      const tag = !all && c ? c.cuisine : '';
-      els = await overpass(center.lat, center.lon, tag ? 20000 : 3000, tag);
-      label = tag ? `${flag(c.code)} ${cname(c.code)}` : t('anyCuisine');
-    } else {
-      els = await overpass(center.lat, center.lon, 5000, '');
-      label = `${flag(c.code)} ${c.city}`;
+      if (state.coords && !state.cityMode) { center = state.coords; label = t('myLocation'); }
+      else { center = await geocode(state.city); label = center.name || state.city; }
+    } else { center = await geocode(c.city, c.code); label = c.city; }
+    const tag = near ? (!all && c ? c.cuisine : '') : '';
+    const key = [useG ? 'g' : 'o', state.tmode, center.lat.toFixed(2), center.lon.toFixed(2), near ? (all ? '*' : cc || '*') : cc].join(':');
+    const fullLabel = (c ? flag(c.code) + ' ' + (near ? cname(c.code) + ' · ' : '') : '') + label;
+    const cached = store.get('rc:' + key, null);
+    if (cached && Date.now() - cached.ts < CACHE_TTL) {
+      state.results = cached.list; state.resLabel = fullLabel; state.center = center; state.src = cached.src;
+      drawResults(cached.list, fullLabel, center, cached.ts);
+      if (Date.now() - cached.ts < 6 * 3600e3) return; // fresh enough: instant, no network
     }
-    let list = els.map(e => toRest(e, center, near ? '' : c.cuisine)).filter(r => r.name && r.lat);
-    list.sort((a, b) => (b.local * 4 + !!b.web * 2 + !!b.hours + !!b.phone) - (a.local * 4 + !!a.web * 2 + !!a.hours + !!a.phone) || a.km - b.km);
-    list = list.slice(0, 60);
-    state.results = list; state.resLabel = label; state.center = center;
+    let list = [], src = 'osm';
+    if (useG) {
+      try { list = await geminiPlaces(center, c && near ? cuisineEn(c) : '', near ? (state.cityMode ? state.city : '') : `${c.city}, ${cname(c.code)}`); src = 'google'; }
+      catch (e) { toast(t('gemFallback')); }
+    }
+    if (!list.length) {
+      const els = near ? await overpass(center.lat, center.lon, tag ? 15000 : 2500, tag) : await overpass(center.lat, center.lon, 4000, '');
+      list = els.map(e => toRest(e, center, near ? '' : c.cuisine)).filter(r => r.name && r.lat);
+      list.sort((a, b) => (b.local * 4 + !!b.web * 2 + !!b.hours + !!b.phone) - (a.local * 4 + !!a.web * 2 + !!a.hours + !!a.phone) || a.km - b.km);
+      list = list.slice(0, 50); src = 'osm';
+    }
+    state.results = list; state.resLabel = fullLabel; state.center = center; state.src = src;
     if (!list.length) {
       setStatus('');
-      $('#map').classList.add('hide');
+      $('#mapWrap').classList.add('hide');
       $('#tRes').innerHTML = `<div class="empty"><span class="e">🍽️</span>${t('none')}<br><br>${near && c && !all ? `<button class="btn ghost" id="tAll">${t('showAll')}</button>` : ''}</div>`;
       const a = $('#tAll'); if (a) a.onclick = () => findRestaurants(true);
       return;
     }
-    drawResults(list, label, center);
-  } catch (e) { setStatus(''); $('#tRes').innerHTML = `<div class="empty"><span class="e">📡</span>${t('netErr')}</div>`; }
+    // everything found stays on the phone: cache + recent searches
+    store.set('rc:' + key, { ts: Date.now(), list, center, src });
+    const rec = store.get('recent', []).filter(r => r.key !== key); rec.unshift({ key, label: fullLabel.replace(/^\S+\s/, (m) => m), ts: Date.now() }); store.set('recent', rec.slice(0, 12));
+    drawResults(list, fullLabel, center);
+  } catch (e) {
+    if (state.results.length) return;
+    setStatus(''); $('#tRes').innerHTML = `<div class="empty"><span class="e">📡</span>${t('netErr')}</div>`;
+  }
 }
-function drawResults(list, label, center) {
-  setStatus(`✅ ${t('found', { n: list.length })} · ${esc(label)} <span style="margin-left:auto;font-size:11px">${t('dataOsm')}</span>`);
-  $('#map').classList.remove('hide');
-  $('#tRes').innerHTML = list.map((r, i) => restRow(r, i)).join('') + `<p class="note" style="text-align:center;margin-top:12px">⭐ ${t('ratingSoon')}</p>`;
+function drawResults(list, label, center, cachedTs) {
+  const g = list[0] && list[0].src === 'google';
+  setStatus(`✅ ${t('found', { n: list.length })} · ${esc(label)}${cachedTs ? ` · <i>${t('cachedAgo', { t: ago(cachedTs) })}</i>` : ''}<span style="margin-left:auto;font-size:11px">${g ? 'Google Maps' : t('dataOsm')}</span>`);
+  $('#mapWrap').classList.remove('hide');
+  $('#tRes').innerHTML = list.map((r, i) => restRow(r, i)).join('') + (g ? '' : `<p class="note" style="text-align:center;margin-top:12px">⭐ ${t('ratingSoon')}</p>`);
   $('#tRes').onclick = e => {
     const h = e.target.closest('[data-rfav]');
     if (h) { const r = list.find(x => x.id === h.dataset.rfav); const on = toggleFav('rests', r.id, r); h.classList.toggle('on', on); return; }
-    const b = e.target.closest('[data-rest]'); if (b) openRest(list.find(x => x.id === b.dataset.rest));
+    const b = e.target.closest('[data-rest]'); if (b) { const r = list.find(x => x.id === b.dataset.rest); focusRest(r); openRest(r); }
   };
-  setTimeout(() => {
-    if (typeof L === 'undefined') return;
-    if (!map) {
-      map = L.map('map', { zoomControl: false, attributionControl: true });
-      L.tileLayer(`https://{s}.basemaps.cartocdn.com/${store.get('dark', false) ? 'dark_all' : 'rastertiles/voyager'}/{z}/{x}/{y}{r}.png`, { maxZoom: 19, subdomains: 'abcd', attribution: '© OpenStreetMap © CARTO' }).addTo(map);
-    }
-    if (markers) markers.remove();
-    markers = L.layerGroup().addTo(map);
-    const pts = [];
-    if (center) { L.marker([center.lat, center.lon], { icon: L.divIcon({ className: '', html: '<div class="wb-pin me"></div>', iconSize: [16, 16] }) }).addTo(markers); pts.push([center.lat, center.lon]); }
-    list.forEach(r => { pts.push([r.lat, r.lon]); L.marker([r.lat, r.lon], { icon: L.divIcon({ className: '', html: '<div class="wb-pin"></div>', iconSize: [16, 16] }) }).on('click', () => openRest(r)).addTo(markers); });
-    map.invalidateSize();
-    map.fitBounds(pts, { padding: [24, 24], maxZoom: 15 });
-  }, 50);
+  setTimeout(() => buildMap(list, center), 30);
 }
+function focusRest(r) { if (!map || !r.lat) return; mapKind === 'gl' ? map.flyTo({ center: [r.lon, r.lat], zoom: 16 }) : map.setView([r.lat, r.lon], 16); }
+function pinEl(r, i) { const d = document.createElement('div'); d.className = 'wb-pin2' + (r && r.src === 'google' ? ' g' : ''); d.innerHTML = r ? `<span>${r.rating ? '★' + r.rating : (i + 1)}</span>` : '<span class="me"></span>'; if (!r) d.className = 'wb-me'; return d; }
+function buildMap(list, center) {
+  const box = $('#map'); if (!box) return;
+  const pts = list.filter(r => r.lat && r.lon);
+  const webgl = (() => { try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); } catch (e) { return false; } })();
+  if (window.maplibregl && webgl && !state.forceLeaflet) {
+    try {
+      mapKind = 'gl';
+      map = new maplibregl.Map({ container: box, style: 'https://tiles.openfreemap.org/styles/liberty', center: [center.lon, center.lat], zoom: 13, attributionControl: { compact: true }, pitchWithRotate: false, dragRotate: false, fadeDuration: 0 });
+      let loaded = false;
+      const fb = setTimeout(() => { if (!loaded) { state.forceLeaflet = true; try { map.remove(); } catch (e) {} buildMap(list, center); } }, 9000);
+      map.on('load', () => { loaded = true; clearTimeout(fb); });
+      new maplibregl.Marker({ element: pinEl(null) }).setLngLat([center.lon, center.lat]).addTo(map);
+      pts.forEach((r, i) => { const m = new maplibregl.Marker({ element: pinEl(r, i) }).setLngLat([r.lon, r.lat]).addTo(map); m.getElement().addEventListener('click', e => { e.stopPropagation(); openRest(r); }); });
+      if (pts.length) { const b = new maplibregl.LngLatBounds([center.lon, center.lat], [center.lon, center.lat]); pts.forEach(r => b.extend([r.lon, r.lat])); map.fitBounds(b, { padding: 40, maxZoom: 15, duration: 0 }); }
+      return;
+    } catch (e) { state.forceLeaflet = true; }
+  }
+  if (typeof L === 'undefined') return;
+  mapKind = 'leaflet';
+  map = L.map(box, { zoomControl: false });
+  L.tileLayer(`https://{s}.basemaps.cartocdn.com/${store.get('dark', false) ? 'dark_all' : 'rastertiles/voyager'}/{z}/{x}/{y}{r}.png`, { maxZoom: 19, subdomains: 'abcd', attribution: '© OpenStreetMap © CARTO' }).addTo(map);
+  const ll = [[center.lat, center.lon]];
+  L.marker([center.lat, center.lon], { icon: L.divIcon({ className: '', html: pinEl(null).outerHTML, iconSize: [18, 18] }) }).addTo(map);
+  pts.forEach((r, i) => { ll.push([r.lat, r.lon]); L.marker([r.lat, r.lon], { icon: L.divIcon({ className: '', html: pinEl(r, i).outerHTML, iconSize: [34, 26], iconAnchor: [17, 26] }) }).on('click', () => openRest(r)).addTo(map); });
+  map.invalidateSize(); map.fitBounds(ll, { padding: [30, 30], maxZoom: 15 });
+}
+function stars(r) { return r.rating ? `<span class="stars">★ ${(+r.rating).toFixed(1)}${r.reviews ? ` <small>(${fmtN(+r.reviews)})</small>` : ''}</span>` : ''; }
 function restRow(r, i) {
-  return `<div class="rest" data-rest="${r.id}" style="animation-delay:${Math.min(i, 10) * 0.03}s"><div class="ico">${r.local ? '⭐' : '🍽️'}</div>
-    <div class="b"><h3>${esc(r.name)}</h3><small>${esc(r.cuisine.join(', ') || r.addr || '')}${r.km ? ' · ' + r.km.toFixed(1) + ' km' : ''}</small>
-    <div class="tags">${r.local ? `<span>${t('localFood')}</span>` : ''}${r.web ? `<span>🌐 ${t('hasSite')}</span>` : ''}${r.hours ? '<span>🕒</span>' : ''}${r.phone ? '<span>📞</span>' : ''}</div></div>
+  return `<div class="rest" data-rest="${r.id}" style="animation-delay:${Math.min(i, 10) * 0.03}s"><div class="ico">${r.src === 'google' ? (i + 1) : (r.local ? '⭐' : '🍽️')}</div>
+    <div class="b"><h3>${esc(r.name)}</h3><small>${stars(r)}${r.price ? ' · ' + esc(r.price) : ''}${r.km ? ' · ' + r.km.toFixed(1) + ' km' : ''}${!r.rating ? ' ' + esc(r.cuisine.join(', ') || r.addr || '') : ''}</small>
+    ${r.summary ? `<small class="sum">${esc(r.summary)}</small>` : ''}
+    <div class="tags">${r.open === true ? `<span class="ok">${t('openNow')}</span>` : r.open === false ? `<span class="no">${t('closed')}</span>` : ''}${r.local && r.src !== 'google' ? `<span>${t('localFood')}</span>` : ''}${r.web ? `<span>🌐 ${t('hasSite')}</span>` : ''}${r.hours ? '<span>🕒</span>' : ''}${r.phone ? '<span>📞</span>' : ''}</div></div>
     <button class="heart ${isFav('rests', r.id) ? 'on' : ''}" data-rfav="${r.id}">${I.heart}</button></div>`;
 }
 function openRest(r) {
-  const dir = `https://www.google.com/maps/dir/?api=1&destination=${r.lat},${r.lon}`;
-  openSheet(`<h2>${esc(r.name)}</h2><p class="sub">${esc(r.cuisine.join(' · ') || '🍽️')}${r.km ? ' · ' + r.km.toFixed(1) + ' km' : ''}</p>
+  const dir = r.lat ? `https://www.google.com/maps/dir/?api=1&destination=${r.lat},${r.lon}` : r.maps;
+  openSheet(`<h2>${esc(r.name)}</h2><p class="sub">${stars(r)} ${esc(r.cuisine.join(' · ') || '')}${r.price ? ' · ' + esc(r.price) : ''}${r.km ? ' · ' + r.km.toFixed(1) + ' km' : ''}</p>
+    ${r.summary ? `<p class="rsum">${esc(r.summary)}</p>` : ''}
     ${r.addr ? `<div class="kv"><span class="k">📍</span><div><small>${t('addr')}</small>${esc(r.addr)}</div></div>` : ''}
     ${r.hours ? `<div class="kv"><span class="k">🕒</span><div><small>${t('hours')}</small>${esc(r.hours)}</div></div>` : ''}
     ${r.phone ? `<div class="kv"><span class="k">📞</span><div><small>${t('call')}</small>${esc(r.phone)}</div></div>` : ''}
     ${r.web ? `<div class="kv"><span class="k">🌐</span><div><small>Web</small>${esc(r.web.replace(/^https?:\/\//, ''))}</div></div>` : `<p class="note" style="margin-top:12px">${t('noSite')}</p>`}
-    <div class="mini-map" id="rMap"></div>
+    ${r.lat ? '<div class="mini-map" id="rMap"></div>' : ''}
     <div class="btn-row">
       ${r.web ? `<a class="btn primary" href="${esc(r.web)}" target="_blank" rel="noopener">🌐 ${t('website')}</a>` : ''}
-      <a class="btn ${r.web ? 'ghost' : 'primary'}" href="${dir}" target="_blank" rel="noopener">🧭 ${t('directions')}</a>
+      <a class="btn ${r.web ? 'ghost' : 'primary'}" href="${esc(dir)}" target="_blank" rel="noopener">🧭 ${t('directions')}</a>
     </div>
-    <div class="btn-row">${r.phone ? `<a class="btn line" href="tel:${esc(r.phone.split(';')[0].replace(/\s/g, ''))}">📞 ${t('call')}</a>` : ''}
-      <button class="btn line" id="rFav">${isFav('rests', r.id) ? '❤️' : '🤍'} ${t('myList')}</button></div>`, s => {
+    <div class="btn-row">${r.maps ? `<a class="btn line" href="${esc(r.maps)}" target="_blank" rel="noopener">🗺️ ${t('openMaps')}</a>` : ''}${r.phone ? `<a class="btn line" href="tel:${esc(r.phone.split(';')[0].replace(/\s/g, ''))}">📞 ${t('call')}</a>` : ''}
+      <button class="btn line" id="rFav">${isFav('rests', r.id) ? '❤️' : '🤍'} ${t('myList')}</button></div>
+    ${r.src === 'google' ? `<p class="note" style="margin-top:10px">${t('srcNote')}</p>` : ''}`, s => {
     $('#rFav', s).onclick = () => { const on = toggleFav('rests', r.id, r); $('#rFav', s).innerHTML = `${on ? '❤️' : '🤍'} ${t('myList')}`; const h = $(`[data-rfav="${r.id}"]`); if (h) h.classList.toggle('on', on); if (state.tab === 'list') renderList(); };
+    if (!r.lat) return;
     setTimeout(() => {
-      if (typeof L === 'undefined') return;
-      const m = L.map($('#rMap', s), { zoomControl: false, attributionControl: false, dragging: true }).setView([r.lat, r.lon], 16);
-      L.tileLayer(`https://{s}.basemaps.cartocdn.com/${store.get('dark', false) ? 'dark_all' : 'rastertiles/voyager'}/{z}/{x}/{y}{r}.png`, { subdomains: 'abcd' }).addTo(m);
-      L.marker([r.lat, r.lon], { icon: L.divIcon({ className: '', html: '<div class="wb-pin"></div>', iconSize: [16, 16] }) }).addTo(m);
-      setTimeout(() => m.invalidateSize(), 400);
+      const box = $('#rMap', s); if (!box) return;
+      const webgl = (() => { try { return !!document.createElement('canvas').getContext('webgl'); } catch (e) { return false; } })();
+      if (window.maplibregl && webgl && !state.forceLeaflet) {
+        const m = new maplibregl.Map({ container: box, style: 'https://tiles.openfreemap.org/styles/liberty', center: [r.lon, r.lat], zoom: 15.5, attributionControl: false, interactive: true, dragRotate: false });
+        new maplibregl.Marker({ element: pinEl(r, 0) }).setLngLat([r.lon, r.lat]).addTo(m);
+        setTimeout(() => m.resize(), 400);
+      } else if (typeof L !== 'undefined') {
+        const m = L.map(box, { zoomControl: false, attributionControl: false }).setView([r.lat, r.lon], 16);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { subdomains: 'abcd' }).addTo(m);
+        L.marker([r.lat, r.lon], { icon: L.divIcon({ className: '', html: pinEl(r, 0).outerHTML, iconSize: [34, 26] }) }).addTo(m);
+        setTimeout(() => m.invalidateSize(), 400);
+      }
     }, 80);
+  });
+}
+
+function cuisineEn(c) { let n = c.code; try { n = new Intl.DisplayNames(['en'], { type: 'region' }).of(c.code); } catch (e) {} return `${n} (national dishes such as ${c.wiki.replace(/ \(.*\)$/, '')})`; }
+/* ---------- PANTRY: "what I have" → what can I cook ---------- */
+const STAPLES = /^(tuz|karabiber|su|ılık su|soğuk su|sıcak su|yağ|sıvı yağ|zeytinyağı|tereyağı|ayçiçek yağı|kızartmak için yağ|baharat|maya|kuru maya|kabartma tozu|karbonat|şeker|toz şeker|pul biber|kimyon|kekik|tarçın|vanilya|defne|defne yaprağı|limon|salt|pepper|water|oil|butter|sugar)$/;
+function needParts(lines) {
+  const out = [];
+  lines.filter(l => !/^servis/i.test(l.trim())).forEach(l => l.split(/,(?!\d)|;/).forEach(p => {
+    const core = shortIng(p).toLocaleLowerCase('tr').replace(/\s*(veya|ya da|isteğe bağlı).*$/, '').trim();
+    if (core && !STAPLES.test(core) && !/isteğe bağlı/.test(p)) out.push(p.trim());
+  }));
+  return out;
+}
+const QUICK_ADD = { tr: ['yumurta', 'un', 'süt', 'domates', 'soğan', 'patates', 'tavuk', 'kıyma', 'pirinç', 'peynir', 'makarna', 'yoğurt', 'biber', 'tereyağı', 'sarımsak', 'ekmek', 'havuç', 'patlıcan', 'limon', 'şeker'],
+  en: ['egg', 'flour', 'milk', 'tomato', 'onion', 'potato', 'chicken', 'minced meat', 'rice', 'cheese', 'pasta', 'yogurt', 'pepper', 'butter', 'garlic', 'bread', 'carrot', 'eggplant', 'lemon', 'sugar'] };
+const EN2TR = { egg: 'yumurta', eggs: 'yumurta', flour: 'un', milk: 'süt', tomato: 'domates', tomatoes: 'domates', onion: 'soğan', potato: 'patates', potatoes: 'patates', chicken: 'tavuk', 'minced meat': 'kıyma', beef: 'dana', rice: 'pirinç', cheese: 'peynir', pasta: 'makarna', noodles: 'erişte', yogurt: 'yoğurt', pepper: 'biber', butter: 'tereyağı', garlic: 'sarımsak', bread: 'ekmek', carrot: 'havuç', eggplant: 'patlıcan', lemon: 'limon', sugar: 'şeker', fish: 'balık', lamb: 'kuzu', beans: 'fasulye', corn: 'mısır', banana: 'muz', honey: 'bal', chocolate: 'çikolata', cream: 'krema', spinach: 'ıspanak', cabbage: 'lahana' };
+const pantry = () => store.get('pantry', []);
+let pantryFilter = store.get('pantryFilter', { quick: false, easy: false, light: false });
+let pantryResults = null;
+
+function allRecipes() {
+  const out = COUNTRIES.map(c => { const rc = sigOf(c.code); return { kind: 'c', id: c.code, name: dishName(c), emoji: c.emoji, wiki: c.wiki, country: c.code, ing: rc.ing, t: rc.t, d: rc.d, s: rc.s }; });
+  RECIPES.forEach(r => out.push({ kind: 'r', id: r.id, name: recName(r), emoji: r.e, wiki: r.wiki, country: r.country, ing: r.ing.tr, t: r.t, d: r.d, s: r.s }));
+  return out;
+}
+const stemOf = w => { w = norm(EN2TR[norm(w)] || w); return w.length <= 3 ? w : w.slice(0, Math.max(4, w.length - 2)); };
+function matchRecipes(items) {
+  const stems = items.map(stemOf).filter(Boolean);
+  if (!stems.length) return [];
+  return allRecipes().map(r => {
+    const need = needParts(r.ing);
+    if (!need.length) return null;
+    const have = need.filter(l => stems.some(s => norm(l).includes(s)));
+    const score = have.length / need.length;
+    const n = estimateNutrition(r.ing, r.s, r.kind + r.id);
+    return { r, score, have: have.length, need: need.length, missing: need.filter(l => !have.includes(l)).map(shortIng), n };
+  }).filter(x => x && x.have > 0)
+    .filter(x => (!pantryFilter.quick || x.r.t <= 30) && (!pantryFilter.easy || x.r.d === 'easy') && (!pantryFilter.light || x.n.kcal <= 500))
+    .sort((a, b) => b.score - a.score || b.have - a.have || a.r.t - b.r.t).slice(0, 20);
+}
+function shortIng(l) { return l.replace(/^[^:]{0,22}:\s*/, '').replace(/\(.*?\)/g, '').replace(/^[\d½¼¾⅓⅔.,\-–\s]+(kg|g|gr|ml|litre|l|su bardağı|yemek kaşığı|tatlı kaşığı|çay kaşığı|paket|demet|diş|baş|dilim|kutu|tutam|avuç|adet|kase)?(?=\s|$)\s*/i, '').trim().slice(0, 28); }
+
+function renderPantry() {
+  const items = pantry(), qa = (QUICK_ADD[lang] || QUICK_ADD[lang === 'az' ? 'tr' : 'en'] || QUICK_ADD.tr).filter(x => !items.includes(x));
+  const ai = store.get('aiRecipes', []);
+  $('#v-pantry').innerHTML = `
+    <div class="top"><div><div class="hi">🧺 World Bite</div><h1>${t('pantryTitle')}</h1></div></div>
+    <p class="hint">${t('pantryHint')}</p>
+    <div class="trow"><label class="search">${I.search}<input id="pIn" placeholder="${t('addIng')}" autocomplete="off"></label><button class="icon-btn" id="pAdd">＋</button></div>
+    <div class="p-chips">${items.map((x, i) => `<span class="p-chip">${ingEmoji(EN2TR[norm(x)] || x)} ${esc(x)}<button data-rm="${i}">×</button></span>`).join('') || `<span class="note">${t('pantryEmpty')}</span>`}</div>
+    <div class="chips" style="margin-top:10px">${qa.slice(0, 14).map(x => `<button class="chip" data-qa="${esc(x)}">＋ ${ingEmoji(EN2TR[x] || x)} ${esc(x)}</button>`).join('')}</div>
+    <div class="chips" style="margin-top:12px">
+      <button class="chip ${pantryFilter.quick ? 'on' : ''}" data-pf="quick">⚡ ${t('quick')}</button>
+      <button class="chip ${pantryFilter.easy ? 'on' : ''}" data-pf="easy">🙂 ${t('easyF')}</button>
+      <button class="chip ${pantryFilter.light ? 'on' : ''}" data-pf="light">🥗 ${t('light')}</button></div>
+    <div class="btn-row"><button class="btn primary" id="pFind" ${items.length ? '' : 'disabled'}>🔍 ${t('whatCook')}</button>
+      <button class="btn ghost" id="pAI" ${items.length ? '' : 'disabled'}>✨ ${t('aiCook')}</button></div>
+    ${!gemKey() ? `<p class="hint small">💡 ${t('aiNeedKey')}</p>` : ''}
+    <div id="pRes"></div>
+    ${ai.length ? `<div class="sec"><h2>✨ ${t('recentAi')}</h2><small>${ai.length}</small></div><div id="pAiList">${ai.map((r, i) => aiRow(r, i)).join('')}</div>` : ''}`;
+  const input = $('#pIn');
+  const add = v => { v = v.trim().toLocaleLowerCase(lang); if (!v) return; const p = pantry(); v.split(/[,;]+/).map(x => x.trim()).filter(Boolean).forEach(x => { if (!p.includes(x)) p.push(x); }); store.set('pantry', p); pantryResults = null; renderPantry(); setTimeout(() => $('#pIn') && $('#pIn').focus(), 30); };
+  input.onkeydown = e => { if (e.key === 'Enter') add(input.value); };
+  $('#pAdd').onclick = () => add(input.value);
+  $$('[data-rm]', $('#v-pantry')).forEach(b => b.onclick = () => { const p = pantry(); p.splice(+b.dataset.rm, 1); store.set('pantry', p); pantryResults = null; renderPantry(); });
+  $$('[data-qa]').forEach(b => b.onclick = () => add(b.dataset.qa));
+  $$('[data-pf]').forEach(b => b.onclick = () => { pantryFilter[b.dataset.pf] = !pantryFilter[b.dataset.pf]; store.set('pantryFilter', pantryFilter); if (pantryResults) pantryResults = matchRecipes(pantry()); renderPantry(); });
+  $('#pFind').onclick = () => { pantryResults = matchRecipes(pantry()); renderPantry(); setTimeout(() => $('#pRes') && $('#pRes').scrollIntoView({ behavior: 'smooth', block: 'start' }), 60); };
+  $('#pAI').onclick = () => gemKey() ? aiRecipe() : (setTab('settings'), toast(t('aiNeedKey')));
+  $$('[data-ai]').forEach(b => b.onclick = e => { if (e.target.closest('[data-airm]')) { const a = store.get('aiRecipes', []); a.splice(+e.target.closest('[data-airm]').dataset.airm, 1); store.set('aiRecipes', a); renderPantry(); return; } openAiRecipe(store.get('aiRecipes', [])[+b.dataset.ai]); });
+  if (pantryResults) {
+    $('#pRes').innerHTML = pantryResults.length ? `<div class="sec"><h2>🍳 ${t('canCook')}</h2><small>${pantryResults.length}</small></div>` + pantryResults.map((x, i) => `
+      <div class="match" role="button" data-open="${x.r.kind}:${x.r.id}" style="animation-delay:${i * 0.03}s">${photo(x.r.kind === 'c' ? x.r.id : x.r.id, x.r.wiki, x.r.emoji)}
+        <div class="b"><small>${flag(x.r.country)} ${esc(cname(x.r.country))}</small><h3>${esc(x.r.name)}</h3>
+          <div class="mbar"><i style="width:${Math.round(x.score * 100)}%"></i></div>
+          <small><b>${t('match', { p: Math.round(x.score * 100) })}</b> · ⏱ ${fmtTime(x.r.t)} · 🔥 ${x.n.kcal} kcal</small>
+          ${x.missing.length ? `<small class="miss">${t('missing')}: ${esc(x.missing.slice(0, 4).join(', '))}${x.missing.length > 4 ? '…' : ''}</small>` : `<small class="okk">✓ ${t('haveAll')}</small>`}</div></div>`).join('')
+      : `<div class="empty"><span class="e">🤔</span>${t('noMatch')}</div>`;
+    hydrate($('#pRes'));
+  }
+}
+function aiRow(r, i) { return `<div class="saved-item" role="button" data-ai="${i}"><div class="ph" style="border-radius:14px"><span class="em">${r.emoji || '🍽️'}</span></div><div class="b"><h3>${esc(r.name)}</h3><small>⏱ ${r.time_min || '?'} ${t('min')} · 🔥 ${r.kcal_per_serving || '?'} kcal · ${esc((r.have || []).slice(0, 3).join(', '))}</small></div><button class="rm" data-airm="${i}">${I.trash}</button></div>`; }
+async function aiRecipe() {
+  const items = pantry();
+  $('#pRes').innerHTML = `<div class="ai-wait"><div class="ai-orb">✨</div><p>${t('aiWorking')}</p></div>`;
+  $('#pRes').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const prompt = `I have these ingredients: ${items.join(', ')}. Suggest ONE quick, tasty, realistic home recipe that uses mainly these (basic pantry items like salt, pepper, oil, water and common spices are allowed; avoid other extras or mark them optional).${pantryFilter.quick ? ' It must take at most 30 minutes.' : ''}${pantryFilter.light ? ' Keep it under 500 kcal per serving.' : ''}
+Write everything in ${LANG_NAME[lang]}. Reply ONLY with JSON: {"name":string,"emoji":string,"cuisine":string,"time_min":number,"servings":number,"difficulty":"easy"|"medium"|"hard","ingredients":[string with amount],"steps":[string],"kcal_per_serving":number,"protein_g":number,"carbs_g":number,"fat_g":number,"fiber_g":number,"tip":string,"serving":string}.
+Each step = one clear action starting with the verb (e.g. crack, whisk, chop, fry, boil, bake, rest, garnish, serve), include the time (e.g. "5 min") and the expected consistency/look. Last step = how to plate and serve it.`;
+  try {
+    const j = await gemini({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json' } }, 45000);
+    const r = gemJSON(gemText(j)); r.have = items.slice(); r.ts = Date.now();
+    const a = store.get('aiRecipes', []); a.unshift(r); store.set('aiRecipes', a.slice(0, 20));
+    renderPantry(); openAiRecipe(r);
+  } catch (e) { $('#pRes').innerHTML = `<div class="empty"><span class="e">⚠️</span>${t('aiErr')}<br><small>${esc(String(e.message || e).slice(0, 140))}</small></div>`; }
+}
+function openAiRecipe(r) {
+  const rc = { t: r.time_min || 20, s: r.servings || 2, d: r.difficulty || 'easy', ing: r.ingredients || [], st: r.steps || [], tr: false, ai: true,
+    n: { kcal: Math.round(r.kcal_per_serving || 0), protein: Math.round(r.protein_g || 0), carbs: Math.round(r.carbs_g || 0), fat: Math.round(r.fat_g || 0), fiber: r.fiber_g } };
+  pushPage(`
+    <div class="hero ai-hero"><div class="ph"><span class="em">${r.emoji || '🍽️'}</span></div>
+      <div class="bar"><button class="round" data-back>${I.back}</button><span class="bar-r"><button class="round" id="shareBtn">${I.share}</button></span></div></div>
+    <div class="dbody">
+      <div class="country">✨ ${t('aiMade')} · ${esc(r.cuisine || '')}</div>
+      <h1>${esc(r.name)}</h1>
+      ${r.tip ? `<div class="block"><h3>💡 ${t('tip')}</h3><p>${esc(r.tip)}</p></div>` : ''}
+      ${recipeHTML(rc)}
+      ${r.serving ? `<div class="block"><h3>🍽️ ${t('serving')}</h3><p>${esc(r.serving)}</p></div>` : ''}
+    </div>`, el => {
+    bindRecipe(el, rc, r.name, { emoji: r.emoji || '🍽️', country: r.cuisine || '' });
+    $('#shareBtn', el).onclick = () => shareRecipe(r.name, r.cuisine || 'World Bite', rc);
   });
 }
 
@@ -750,16 +1001,32 @@ function renderSettings() {
       <label class="sw customsw ${SWATCHES.map(x => x.toLowerCase()).includes(color.toLowerCase()) ? '' : 'on'}" title="${t('custom')}"><input type="color" id="cc" value="${color}"></label></div>
       <div class="row" id="darkRow"><span class="ri">${I.moon}</span><span class="lbl">${t('darkMode')}</span><span class="toggle ${dark ? 'on' : ''}" style="flex:none"></span></div></div>
     <div class="group"><h4>${t('language')}</h4><div class="langs">${[['tr', 'Türkçe'], ['az', 'Azərbaycan'], ['en', 'English'], ['ru', 'Русский']].map(([k, n]) => `<button data-l="${k}" class="${k === lang ? 'on' : ''}">${n}</button>`).join('')}</div></div>
+    <div class="group"><h4>✨ ${t('gemTitle')}</h4>
+      <div class="gem"><p class="credits" style="padding:0 0 10px">${t('gemInfo')}</p>
+        <div class="field"><span class="ic">🔑</span><input id="gKey" type="password" placeholder="${t('gemKey')}" value="${esc(store.get('gemKey', ''))}" autocomplete="off"></div>
+        <div class="field" style="margin-top:8px"><span class="ic">🤖</span><input id="gModel" placeholder="gemini-flash-latest" value="${esc(store.get('gemModel', ''))}" autocomplete="off"></div>
+        <div class="btn-row"><button class="btn ghost" id="gTest">${t('gemTest')}</button><a class="btn line" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">${t('gemGet')}</a></div>
+        <p class="note" id="gRes"></p></div></div>
     <div class="group"><h4>${t('account')}</h4>
+      <button class="row" id="sHist"><span class="ri">${I.trash}</span><span class="lbl">${t('clearHistory')}</span>${I.chev}</button>
       <button class="row" id="sIntro"><span class="ri">${I.replay}</span><span class="lbl">${t('replayIntro')}</span>${I.chev}</button>
       <button class="row" id="sCache"><span class="ri">${I.trash}</span><span class="lbl">${t('clearCache')}</span>${I.chev}</button>
       <button class="row danger" id="sOut"><span class="ri">${I.logout}</span><span class="lbl">${t('logout')}</span></button></div>
-    <div class="group"><h4>${t('about2')}</h4><div class="row"><span class="ri">${I.info}</span><span class="lbl">World Bite</span><small>${t('version')} 1.1.0</small></div><p class="credits">${t('credits')}</p></div>`;
+    <div class="group"><h4>${t('about2')}</h4><div class="row"><span class="ri">${I.info}</span><span class="lbl">World Bite</span><small>${t('version')} 1.2.0</small></div><p class="credits">${t('credits')}</p></div>`;
   $$('.sw[data-c]').forEach(b => b.onclick = () => { store.set('color', b.dataset.c); applyTheme(); renderSettings(); });
   $('#cc').oninput = e => { store.set('color', e.target.value); applyTheme(); };
   $('#cc').onchange = () => renderSettings();
   $('#darkRow').onclick = () => { store.set('dark', !store.get('dark', false)); applyTheme(); renderSettings(); if (map) { map = null; } state.results.length && renderTravel(); };
   $$('.langs button').forEach(b => b.onclick = () => { lang = b.dataset.l; store.set('lang', lang); document.documentElement.lang = lang; enterApp(); setTab('settings'); });
+  const saveG = () => { store.set('gemKey', $('#gKey').value.trim()); store.set('gemModel', $('#gModel').value.trim()); renderTravel(); renderPantry(); };
+  $('#gKey').onchange = saveG; $('#gModel').onchange = saveG;
+  $('#gTest').onclick = async () => {
+    saveG(); const out = $('#gRes'); if (!gemKey()) { out.textContent = t('gemKey'); return; }
+    out.innerHTML = '<span class="spinner" style="display:inline-block;vertical-align:middle"></span>';
+    try { const j = await gemini({ contents: [{ role: 'user', parts: [{ text: 'Reply with the single word: OK' }] }] }, 20000); out.textContent = '✅ ' + t('gemOk') + ' (' + gemModel() + ': ' + gemText(j).trim().slice(0, 20) + ')'; }
+    catch (e) { out.textContent = '❌ ' + t('gemFail') + ': ' + String(e.message || e).slice(0, 120); }
+  };
+  $('#sHist').onclick = () => { try { Object.keys(localStorage).filter(k => /^wb_(rc:|geo:|recent)/.test(k)).forEach(k => localStorage.removeItem(k)); } catch (e) {} state.results = []; renderTravel(); toast(t('historyCleared')); };
   $('#sIntro').onclick = () => { stack.length = 0; $('#overlays').innerHTML = ''; renderOnboarding(); };
   $('#sCache').onclick = () => { try { Object.keys(localStorage).filter(k => k.startsWith('wb_w:')).forEach(k => localStorage.removeItem(k)); } catch (e) {} for (const k in wikiMem) delete wikiMem[k]; toast(t('cleared')); };
   $('#sOut').onclick = () => { store.del('session'); authMode = 'login'; renderAuth(); };
