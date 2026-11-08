@@ -1,6 +1,7 @@
 /* UI translations: tr, az, en, ru */
 const I18N = {
 tr: {
+  pressAgain:"Çıkmak için tekrar bas",startCooking:"Pişirmeye başla",stepOf:"Adım {i} / {n}",prev:"Geri",nextStep:"Sonraki",finish:"Bitir",bonApp:"Afiyet olsun!",bonAppD:"Tarifi tamamladın. Fotoğrafını çekmeyi unutma 📸",share:"Paylaş",copied:"Panoya kopyalandı",dishOfDay:"Günün yemeği",featured:"Öne çıkan tarifler",recipe:"Tarif",moreRecipes:"Diğer tarifler",sigLangNote:"",days:"gün",hours2:"saat",
   tagline: "Gez, tat, keşfet",
   skip: "Geç", next: "İleri", start: "Başlayalım",
   ob1t: "Dünyanın mutfağı cebinde", ob1d: "196 ülkenin en sevilen yemeği, hikayesi ve fotoğrafıyla tek bir uygulamada.",
@@ -41,6 +42,7 @@ tr: {
   recipeLangNote: "", account: "Hesap", provider: { email: "E-posta", google: "Gmail", facebook: "Facebook" }
 },
 az: {
+  pressAgain:"Çıxmaq üçün yenidən bas",startCooking:"Bişirməyə başla",stepOf:"Addım {i} / {n}",prev:"Geri",nextStep:"Növbəti",finish:"Bitir",bonApp:"Nuş olsun!",bonAppD:"Resepti tamamladın. Şəklini çəkməyi unutma 📸",share:"Paylaş",copied:"Mübadilə buferinə kopyalandı",dishOfDay:"Günün yeməyi",featured:"Seçilmiş reseptlər",recipe:"Resept",moreRecipes:"Digər reseptlər",sigLangNote:"",days:"gün",hours2:"saat",
   tagline: "Gəz, dad, kəşf et",
   skip: "Keç", next: "İrəli", start: "Başlayaq",
   ob1t: "Dünyanın mətbəxi cibində", ob1d: "196 ölkənin ən sevilən yeməyi, hekayəsi və şəkli ilə bir tətbiqdə.",
@@ -81,6 +83,7 @@ az: {
   recipeLangNote: "Demo: resept mətnləri hələlik türkcədir.", account: "Hesab", provider: { email: "E-poçt", google: "Gmail", facebook: "Facebook" }
 },
 en: {
+  pressAgain:"Press back again to exit",startCooking:"Start cooking",stepOf:"Step {i} of {n}",prev:"Back",nextStep:"Next",finish:"Finish",bonApp:"Enjoy your meal!",bonAppD:"You finished the recipe. Don't forget to take a photo 📸",share:"Share",copied:"Copied to clipboard",dishOfDay:"Dish of the day",featured:"Featured recipes",recipe:"Recipe",moreRecipes:"More recipes",sigLangNote:"Recipe text is in Turkish for now — translations are coming.",days:"days",hours2:"h",
   tagline: "Travel, taste & discover",
   skip: "Skip", next: "Next", start: "Let's go",
   ob1t: "The world's kitchen in your pocket", ob1d: "The best-loved dish of 196 countries, with its story and photo, in one app.",
@@ -121,6 +124,7 @@ en: {
   recipeLangNote: "", account: "Account", provider: { email: "Email", google: "Gmail", facebook: "Facebook" }
 },
 ru: {
+  pressAgain:"Нажмите ещё раз для выхода",startCooking:"Начать готовить",stepOf:"Шаг {i} из {n}",prev:"Назад",nextStep:"Далее",finish:"Готово",bonApp:"Приятного аппетита!",bonAppD:"Рецепт готов. Не забудьте сфотографировать 📸",share:"Поделиться",copied:"Скопировано",dishOfDay:"Блюдо дня",featured:"Избранные рецепты",recipe:"Рецепт",moreRecipes:"Другие рецепты",sigLangNote:"Текст рецепта пока на турецком — перевод скоро.",days:"дн.",hours2:"ч",
   tagline: "Путешествуй, пробуй, открывай",
   skip: "Пропустить", next: "Далее", start: "Начать",
   ob1t: "Кухня мира в кармане", ob1d: "Самое любимое блюдо 196 стран — с историей и фото — в одном приложении.",

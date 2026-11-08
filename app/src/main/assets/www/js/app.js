@@ -40,6 +40,7 @@ const I = {
   replay: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>',
   logout: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 4h4v16h-4M10 17l5-5-5-5M15 12H3"/></svg>',
+  share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>',
   info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>',
   google: '<svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>',
   facebook: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#1877F2"/><path fill="#fff" d="M13.4 21v-7h2.4l.4-2.8h-2.8V9.4c0-.8.2-1.4 1.4-1.4h1.5V5.5c-.3 0-1.1-.1-2.2-.1-2.2 0-3.6 1.3-3.6 3.7v2.1H8.1V14h2.4v7z"/></svg>'
@@ -178,15 +179,27 @@ const fmtN = n => n >= 1000 ? (n / 1000).toFixed(1).replace('.0', '') + 'k' : St
 /* ---------- state & navigation ---------- */
 const state = { tab: 'explore', pop: store.get('pop', 'd'), cat: 'all', cont: 'all', q: '', tmode: 'near', city: store.get('city', ''), coords: null, cuisine: '', trip: '', results: [], resLabel: '' };
 const stack = [];
-function pushPage(html, mount) {
-  const el = document.createElement('div'); el.className = 'page'; el.innerHTML = html;
+let lastPush = 0, lastBackAtRoot = 0;
+function pushPage(html, mount, cls) {
+  const now = Date.now();
+  if (now - lastPush < 450) return null; // ignore accidental double taps
+  lastPush = now;
+  const el = document.createElement('div'); el.className = 'page' + (cls ? ' ' + cls : ''); el.innerHTML = html;
   $('#overlays').appendChild(el); stack.push(el); hydrate(el); mount && mount(el);
   $$('[data-back]', el).forEach(b => b.onclick = back);
+  return el;
 }
 function back() {
   if (sheetOpen()) { closeSheet(); return true; }
-  if (stack.length) { const el = stack.pop(); el.classList.add('out'); setTimeout(() => el.remove(), 240); return true; }
+  if (stack.length) { const el = stack.pop(); if (el._onClose) el._onClose(); el.classList.add('out'); setTimeout(() => el.remove(), 240); return true; }
   if ($('#main').classList.contains('show') && state.tab !== 'explore') { setTab('explore'); return true; }
+  if ($('#main').classList.contains('show')) {
+    const v = $('#v-explore');
+    if (state.q) { state.q = ''; renderExplore(); return true; }
+    if (v.scrollTop > 200) { v.scrollTo({ top: 0, behavior: 'smooth' }); return true; }
+    if (Date.now() - lastBackAtRoot > 2000) { lastBackAtRoot = Date.now(); toast(t('pressAgain')); return true; }
+    return false;
+  }
   if ($('#onboarding').classList.contains('show') && ob.i > 0) { obGo(ob.i - 1); return true; }
   return false;
 }
@@ -341,9 +354,10 @@ function renderExplore() {
     <label class="search">${I.search}<input id="exQ" placeholder="${t('searchExplore')}" value="${esc(state.q)}" autocomplete="off"><button class="x ${state.q ? '' : 'hide'}" id="exX">×</button></label>
     <div id="exSearch"></div>
     <div id="exHome">
+      <div id="dotd"></div>
       <div class="sec"><h2>🔥 ${t('popular')}</h2><div class="mini-seg" id="popSeg"><button data-p="d">${t('daily')}</button><button data-p="w">${t('weekly')}</button></div></div>
       <div class="hscroll" id="popList"></div>
-      <div class="sec"><h2>👩‍🍳 ${t('stepRecipes')}</h2><small>${RECIPES.length}</small></div>
+      <div class="sec"><h2>👩‍🍳 ${t('featured')}</h2><small>${RECIPES.length}</small></div>
       <div class="hscroll">${RECIPES.map((r, i) => recipeCard(r, i)).join('')}</div>
       <div class="sec"><h2>🌍 ${t('allCountries')}</h2><small id="cCount"></small></div>
       <div class="chips" id="catChips"></div>
@@ -355,17 +369,23 @@ function renderExplore() {
   q.oninput = () => { state.q = q.value; $('#exX').classList.toggle('hide', !state.q); drawSearch(); };
   $('#exX').onclick = () => { q.value = state.q = ''; $('#exX').classList.add('hide'); drawSearch(); };
   $$('#popSeg button').forEach(b => b.onclick = () => { state.pop = b.dataset.p; store.set('pop', state.pop); renderPopular(); });
-  bindOpeners($('#v-explore'));
-  renderPopular(); drawChips(); drawGrid(); drawSearch();
+  renderDotd(); renderPopular(); drawChips(); drawGrid(); drawSearch();
 }
 function countryCard(c, i) {
   return `<div class="ccard" role="button" data-open="c:${c.code}" style="animation-delay:${Math.min(i, 12) * 0.03}s">
     ${photo(c.code, c.wiki, c.emoji)}<span class="flag">${flag(c.code)}</span>${heartBtn('dishes', c.code)}
-    <div class="b"><h3>${esc(cname(c.code))}</h3><p>${esc(dishName(c))}</p><span class="badge">★ ${t(c.strength)}</span></div></div>`;
+    <div class="b"><h3>${esc(cname(c.code))}</h3><p>${esc(dishName(c))}</p><div class="badges"><span class="badge">★ ${t(c.strength)}</span><span class="badge soft">⏱ ${fmtTime(sigOf(c.code).t)}</span></div></div></div>`;
 }
 function recipeCard(r, i) {
   return `<button class="rcard" data-open="r:${r.id}" style="animation-delay:${i * 0.04}s">${photo(r.id, r.wiki, r.e)}
     <div class="b"><small>${flag(r.country)} ${esc(cname(r.country))}</small><h3>${esc(recName(r))}</h3><small>⏱ ${r.t} ${t('min')} · ${t(r.d)}</small><span class="badge">${t(r.cat)}</span></div></button>`;
+}
+function renderDotd() {
+  const d = new Date(), idx = hash(d.toISOString().slice(0, 10) + 'dotd') % COUNTRIES.length, c = COUNTRIES[idx], rc = sigOf(c.code);
+  $('#dotd').innerHTML = `<div class="dotd" role="button" data-open="c:${c.code}">${photo(c.code, c.wiki, c.emoji, true)}
+    <div class="dotd-shade"></div><span class="dotd-tag">✨ ${t('dishOfDay')}</span>${heartBtn('dishes', c.code)}
+    <div class="dotd-b"><small>${flag(c.code)} ${esc(cname(c.code))}</small><h2>${esc(dishName(c))}</h2><span>⏱ ${fmtTime(rc.t)} · 📊 ${t(rc.d)} · ${t(c.cat)}</span></div></div>`;
+  hydrate($('#dotd'));
 }
 function renderPopular() {
   const el = $('#popList'); if (!el) return;
@@ -395,28 +415,90 @@ function drawSearch() {
   $('#exHome').classList.toggle('hide', !!q);
   const box = $('#exSearch');
   if (!q) { box.innerHTML = ''; return; }
-  const cs = COUNTRIES.filter(c => [cname(c.code), c.dish, c.wiki, c.code, c.story].some(x => norm(x).includes(q)));
-  const rs = RECIPES.filter(r => [r.name.tr, r.name.en, r.local, cname(r.country)].some(x => norm(x).includes(q)));
+  const cs = COUNTRIES.filter(c => [cname(c.code), c.dish, c.wiki, c.code, c.story, ...(sigOf(c.code).ing)].some(x => norm(x).includes(q)));
+  const rs = RECIPES.filter(r => [r.name.tr, r.name.en, r.local, cname(r.country), ...r.ing.tr, ...r.ing.en].some(x => norm(x).includes(q)));
   box.innerHTML = (rs.length ? `<div class="sec"><h2>${t('recipes')}</h2><small>${rs.length}</small></div><div class="hscroll">${rs.map(recipeCard).join('')}</div>` : '') +
     (cs.length ? `<div class="sec"><h2>${t('allCountries')}</h2><small>${t('countriesN', { n: cs.length })}</small></div><div class="grid">${cs.map(countryCard).join('')}</div>` : '') +
     (!cs.length && !rs.length ? `<div class="empty"><span class="e">🔍</span>${t('noResults')}</div>` : '');
   hydrate(box);
 }
-function bindOpeners(root) {
-  root.addEventListener('click', e => {
-    const b = e.target.closest('[data-open]'); if (!b || e.target.closest('[data-fav]')) return;
-    const [k, id] = b.dataset.open.split(':');
-    k === 'c' ? openCountry(id) : openRecipe(id);
-  });
+// Opening detail pages is handled by ONE global listener (prevents duplicate pages)
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-open]'); if (!b || e.target.closest('[data-fav]')) return;
+  const [k, id] = b.dataset.open.split(':');
+  k === 'c' ? openCountry(id) : openRecipe(id);
+});
+
+/* ---------- Recipes: shared helpers ---------- */
+function sigOf(code) {
+  if (code === 'AZ') { const r = recipeById['az-main'], l = cl(); return { t: r.t, s: r.s, d: r.d, ing: r.ing[l], st: r.st[l], tr: false }; }
+  const g = SIG[code]; return g ? Object.assign({ tr: true }, g) : null;
+}
+function recipeHTML(rc, title) {
+  return `<div class="info-row" style="margin-top:14px"><span class="pill p">⏱ ${fmtTime(rc.t)}</span><span class="pill">👥 ${rc.s} ${t('servings')}</span><span class="pill">📊 ${t(rc.d)}</span></div>
+    ${rc.tr && (lang === 'en' || lang === 'ru') ? `<p class="note">${t('sigLangNote')}</p>` : ''}
+    <button class="btn primary block cook-btn" data-cook>👩‍🍳 ${t('startCooking')}</button>
+    <div class="prog"><i class="rProg"></i></div>
+    <div class="block"><h3>🧺 ${t('ingredients')} <small class="cnt">${rc.ing.length}</small></h3><ul class="ing">${rc.ing.map(x => `<li><span class="box">✓</span><span>${esc(x)}</span></li>`).join('')}</ul><p class="note">👆 ${t('tapHint')}</p></div>
+    <div class="block" style="animation-delay:.08s"><h3>🔥 ${t('steps')} <small class="cnt">${rc.st.length}</small></h3><ol class="steps">${rc.st.map((x, i) => `<li><span class="n">${i + 1}</span><span>${esc(x)}</span></li>`).join('')}</ol></div>`;
+}
+function bindRecipe(el, rc, name) {
+  const upd = () => { const all = $$('.ing li,.steps li', el), d = all.filter(x => x.classList.contains('done')); $$('.rProg', el).forEach(p => p.style.width = (d.length / all.length * 100) + '%'); };
+  $$('.ing li,.steps li', el).forEach(li => li.onclick = () => { li.classList.toggle('done'); upd(); });
+  $$('[data-cook]', el).forEach(b => b.onclick = () => cookMode(rc, name));
+}
+function fmtTime(m) {
+  if (m >= 1440) return Math.round(m / 1440) + ' ' + t('days');
+  if (m >= 120) return (Math.round(m / 30) / 2).toString().replace('.5', ',5') + ' ' + t('hours2');
+  return m + ' ' + t('min');
+}
+function share(title, text) {
+  const msg = `${title}\n${text}\n\n— World Bite 🌍🍽️`;
+  try { if (window.Android && Android.share) { Android.share(msg); return; } } catch (e) {}
+  if (navigator.share) { navigator.share({ title, text: msg }).catch(() => {}); return; }
+  try { navigator.clipboard.writeText(msg).then(() => toast(t('copied'))); } catch (e) {}
+}
+function shareRecipe(name, country, rc) {
+  share(`${name} (${country})`, `${t('ingredients')}:\n• ${rc.ing.join('\n• ')}\n\n${t('steps')}:\n${rc.st.map((x, i) => (i + 1) + '. ' + x).join('\n')}`);
+}
+function keepAwake(on) { try { window.Android && Android.keepAwake && Android.keepAwake(!!on); } catch (e) {} }
+
+/* ---------- Cook mode: one big step at a time ---------- */
+function cookMode(rc, name) {
+  let i = 0; const n = rc.st.length;
+  const el = pushPage(`
+    <div class="cook-top"><button class="round" data-back>✕</button><div class="cook-title">${esc(name)}</div><button class="round" id="ckIng">🧺</button></div>
+    <div class="cook-bar"><i id="ckBar"></i></div>
+    <div class="cook-stage" id="ckStage"></div>
+    <div class="cook-nav"><button class="btn line" id="ckPrev">← ${t('prev')}</button><button class="btn primary" id="ckNext">${t('nextStep')} →</button></div>`, el => {
+    const draw = () => {
+      const done = i >= n;
+      $('#ckBar', el).style.width = (Math.min(i + 1, n) / n * 100) + '%';
+      $('#ckStage', el).innerHTML = done
+        ? `<div class="cook-card fin"><div class="big">🎉</div><h2>${t('bonApp')}</h2><p>${t('bonAppD')}</p></div>`
+        : `<div class="cook-card"><div class="cook-n">${t('stepOf', { i: i + 1, n })}</div><p>${esc(rc.st[i])}</p></div>`;
+      $('#ckPrev', el).style.visibility = i === 0 ? 'hidden' : 'visible';
+      $('#ckNext', el).textContent = done ? t('finish') + ' ✓' : (i === n - 1 ? t('finish') + ' 🎉' : t('nextStep') + ' →');
+    };
+    $('#ckNext', el).onclick = () => { if (i >= n) { back(); return; } i++; draw(); };
+    $('#ckPrev', el).onclick = () => { if (i > 0) { i--; draw(); } };
+    $('#ckIng', el).onclick = () => openSheet(`<h2>🧺 ${t('ingredients')}</h2><p class="sub">${esc(name)}</p><ul class="ing">${rc.ing.map(x => `<li><span class="box">✓</span><span>${esc(x)}</span></li>`).join('')}</ul>`, s => $$('.ing li', s).forEach(li => li.onclick = () => li.classList.toggle('done')));
+    let sx = null;
+    el.addEventListener('touchstart', e => sx = e.touches[0].clientX, { passive: true });
+    el.addEventListener('touchend', e => { if (sx == null) return; const dx = e.changedTouches[0].clientX - sx; if (dx < -60 && i < n) { i++; draw(); } if (dx > 60 && i > 0) { i--; draw(); } sx = null; });
+    draw();
+  }, 'cook');
+  if (el) { keepAwake(true); el._onClose = () => keepAwake(false); }
 }
 
 /* ---------- Country detail ---------- */
 function openCountry(code) {
-  const c = byCode[code]; const recs = RECIPES.filter(r => r.country === code);
+  const c = byCode[code]; const sig = sigOf(code);
+  const others = RECIPES.filter(r => r.country === code && !(code === 'AZ' && r.id === 'az-main'));
   const storyLang = lang === 'tr' || lang === 'az';
   pushPage(`
     <div class="hero">${photo(c.code, c.wiki, c.emoji, true)}
-      <div class="bar"><button class="round" data-back>${I.back}</button>${heartBtn('dishes', c.code, 'round')}</div>
+      <div class="bar"><button class="round" data-back>${I.back}</button><span class="bar-r"><button class="round" id="shareBtn">${I.share}</button>${heartBtn('dishes', c.code, 'round')}</span></div>
       <span class="credit">${t('photoCredit')}</span></div>
     <div class="dbody">
       <div class="country"><span class="f">${flag(c.code)}</span>${esc(cname(c.code))} · ${t(c.cont)}</div>
@@ -424,10 +506,12 @@ function openCountry(code) {
       <div class="info-row"><span class="pill p">★ ${t('strongAt')}: ${t(c.strength)}</span><span class="pill">${c.emoji} ${t(c.cat)}</span></div>
       ${storyLang ? `<div class="block"><h3>📜 ${t('story')}</h3><p>${esc(c.story)}</p></div>` : ''}
       <div class="block" id="wikiBlock" style="animation-delay:.08s"><h3>📖 ${storyLang ? t('about') : t('story')}</h3><div class="sk"></div><div class="sk" style="width:80%"></div><div class="sk" style="width:60%"></div></div>
-      ${recs.length ? `<div class="sec"><h2>👩‍🍳 ${t('recipes')}</h2><small>${recs.length}</small></div><div class="hscroll">${recs.map(recipeCard).join('')}</div>` : ''}
+      ${sig ? `<div class="sec" style="margin-bottom:0"><h2>📝 ${t('recipe')}</h2></div>${recipeHTML(sig)}` : ''}
+      ${others.length ? `<div class="sec"><h2>👩‍🍳 ${t('moreRecipes')}</h2><small>${others.length}</small></div><div class="hscroll">${others.map(recipeCard).join('')}</div>` : ''}
       <button class="btn primary block cta" id="goEat">📍 ${t('whereEat')}</button>
     </div>`, el => {
-    bindOpeners(el);
+    if (sig) bindRecipe(el, sig, dishName(c));
+    $('#shareBtn', el).onclick = () => sig ? shareRecipe(dishName(c), cname(c.code), sig) : share(dishName(c), c.story);
     $('#goEat', el).onclick = () => { state.tmode = 'near'; state.cuisine = code; state.trip = code; while (stack.length) back(); setTab('travel'); renderTravel(); };
     wikiGet(c.wiki, lang).then(w => {
       const b = $('#wikiBlock', el); if (!b) return;
@@ -441,24 +525,22 @@ function openCountry(code) {
 
 /* ---------- Recipe detail ---------- */
 function openRecipe(id) {
-  const r = recipeById[id], l = cl(), ing = r.ing[l], st = r.st[l];
+  const r = recipeById[id], l = cl(), rc = { t: r.t, s: r.s, d: r.d, ing: r.ing[l], st: r.st[l], tr: false };
   pushPage(`
     <div class="hero">${photo(r.id, r.wiki, r.e, true)}
-      <div class="bar"><button class="round" data-back>${I.back}</button>${heartBtn('recipes', r.id, 'round')}</div>
+      <div class="bar"><button class="round" data-back>${I.back}</button><span class="bar-r"><button class="round" id="shareBtn">${I.share}</button>${heartBtn('recipes', r.id, 'round')}</span></div>
       <span class="credit">${t('photoCredit')}</span></div>
     <div class="dbody">
       <div class="country"><span class="f">${flag(r.country)}</span>${esc(cname(r.country))} · <i>${esc(r.local)}</i></div>
       <h1>${esc(recName(r))}</h1>
       <p style="color:var(--muted);margin-bottom:12px">${esc(r.desc[l])}</p>
-      <div class="info-row"><span class="pill p">⏱ ${r.t} ${t('min')}</span><span class="pill">👥 ${r.s} ${t('servings')}</span><span class="pill">📊 ${t(r.d)}</span><span class="pill">${t(r.cat)}</span></div>
+      <div class="info-row"><span class="pill">${t(r.cat)}</span><span class="pill">🌍 ${esc(r.local)}</span></div>
       ${t('recipeLangNote') ? `<p class="note">${t('recipeLangNote')}</p>` : ''}
-      <div class="prog"><i id="rProg"></i></div>
-      <div class="block"><h3>🧺 ${t('ingredients')}</h3><ul class="ing">${ing.map(x => `<li><span class="box">✓</span><span>${esc(x)}</span></li>`).join('')}</ul><p class="note">👆 ${t('tapHint')}</p></div>
-      <div class="block" style="animation-delay:.08s"><h3>🔥 ${t('steps')}</h3><ol class="steps">${st.map((x, i) => `<li><span class="n">${i + 1}</span><span>${esc(x)}</span></li>`).join('')}</ol></div>
+      ${recipeHTML(rc)}
       <button class="btn ghost block cta" id="goEat">📍 ${t('whereEat')}</button>
     </div>`, el => {
-    const upd = () => { const all = $$('.ing li,.steps li', el), d = all.filter(x => x.classList.contains('done')); $('#rProg', el).style.width = (d.length / all.length * 100) + '%'; };
-    $$('.ing li,.steps li', el).forEach(li => li.onclick = () => { li.classList.toggle('done'); upd(); });
+    bindRecipe(el, rc, recName(r));
+    $('#shareBtn', el).onclick = () => shareRecipe(recName(r), cname(r.country), rc);
     $('#goEat', el).onclick = () => { state.tmode = 'near'; state.cuisine = r.country; state.trip = r.country; while (stack.length) back(); setTab('travel'); renderTravel(); };
   });
 }
@@ -647,7 +729,7 @@ function renderList() {
       ...f.dishes.map(code => byCode[code] && { type: 'dishes', id: code, open: 'c:' + code, ph: photo(code, byCode[code].wiki, byCode[code].emoji), name: dishName(byCode[code]), sub: `${flag(code)} ${cname(code)} · ${t('signature')}` })].filter(Boolean);
     body.innerHTML = items.length ? items.map((x, i) => `<button class="saved-item" data-open="${x.open}" style="animation-delay:${i * 0.04}s">${x.ph}<div class="b"><h3>${esc(x.name)}</h3><small>${esc(x.sub)}</small></div><span class="rm" data-fav="${x.type}" data-id="${x.id}">${I.heart}</span></button>`).join('')
       : `<div class="empty"><span class="e">🍲</span>${t('emptyRecipes')}</div>`;
-    bindOpeners(body); hydrate(body);
+    hydrate(body);
   } else {
     body.innerHTML = f.rests.length ? f.rests.map((r, i) => `<div class="saved-item" data-r="${r.id}" style="animation-delay:${i * 0.04}s"><div class="ph" style="border-radius:14px"><span class="em">🍽️</span></div><div class="b"><h3>${esc(r.name)}</h3><small>${esc(r.cuisine.join(', ') || r.addr || '')}</small></div><button class="rm" data-rm="${r.id}">${I.heart}</button></div>`).join('')
       : `<div class="empty"><span class="e">🍽️</span>${t('emptyRest')}</div>`;
@@ -672,7 +754,7 @@ function renderSettings() {
       <button class="row" id="sIntro"><span class="ri">${I.replay}</span><span class="lbl">${t('replayIntro')}</span>${I.chev}</button>
       <button class="row" id="sCache"><span class="ri">${I.trash}</span><span class="lbl">${t('clearCache')}</span>${I.chev}</button>
       <button class="row danger" id="sOut"><span class="ri">${I.logout}</span><span class="lbl">${t('logout')}</span></button></div>
-    <div class="group"><h4>${t('about2')}</h4><div class="row"><span class="ri">${I.info}</span><span class="lbl">World Bite</span><small>${t('version')} 1.0.0</small></div><p class="credits">${t('credits')}</p></div>`;
+    <div class="group"><h4>${t('about2')}</h4><div class="row"><span class="ri">${I.info}</span><span class="lbl">World Bite</span><small>${t('version')} 1.1.0</small></div><p class="credits">${t('credits')}</p></div>`;
   $$('.sw[data-c]').forEach(b => b.onclick = () => { store.set('color', b.dataset.c); applyTheme(); renderSettings(); });
   $('#cc').oninput = e => { store.set('color', e.target.value); applyTheme(); };
   $('#cc').onchange = () => renderSettings();

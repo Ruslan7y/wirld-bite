@@ -42,8 +42,8 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.${{ github.run_number }}
-          name: World Bite v1.0.${{ github.run_number }}
+          tag_name: v1.1.${{ github.run_number }}
+          name: World Bite v1.1.${{ github.run_number }}
           body: |
             📱 **World Bite** Android APK — telefona indir ve yükle.
             Download `WorldBite.apk` below and open it on your Android phone.
