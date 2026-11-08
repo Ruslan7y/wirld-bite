@@ -99,3 +99,11 @@ function chefLine(key, lang, vars) {
 }
 const CHEF_RANKS = [[0, 'r1'], [12, 'r2'], [40, 'r3'], [90, 'r4'], [180, 'r5']];
 const CHEF_TOOL = { crack: '🥚', whisk: '🥄', mix: '🥄', chop: '🔪', knead: '👐', roll: '🪵', fry: '🍳', boil: '🥄', bake: '🧤', grill: '🍢', steam: '🥢', wrap: '🌯', layer: '🥧', rest: '⏳', garnish: '🌿', serve: '🍽️' };
+
+/* Costume accessories unlocked through the food passport; drawn on top of the chef. */
+const ACC_DEF = { scarf: { e: '🧣', slot: 'neck' }, fan: { e: '🪭', slot: 'hand' }, bow: { e: '🎀', slot: 'head' }, shades: { e: '🕶️', slot: 'eyes' }, flower: { e: '🌺', slot: 'head' }, tophat: { e: '🎩', slot: 'top' }, sunhat: { e: '👒', slot: 'top' }, crown: { e: '👑', slot: 'top' } };
+function chefHTML(id, mood) {
+  let acc = ''; try { acc = JSON.parse(localStorage.getItem('wb_acc') || '""'); } catch (e) {}
+  const a = ACC_DEF[acc];
+  return `<div class="chef-wrap c-${id}">${chefSVG(id, mood)}${a ? `<span class="acc-on slot-${a.slot}">${a.e}</span>` : ''}</div>`;
+}

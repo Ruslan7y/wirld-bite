@@ -410,7 +410,7 @@ function setView(v, force) {
   const home = $('#exHome'), mp = $('#exMap');
   if (v === 'map') {
     home.classList.add('hide'); mp.classList.remove('hide'); mp.classList.remove('fade-in'); void mp.offsetWidth; mp.classList.add('fade-in');
-    if (!WorldMap.ready || force) WorldMap.mount($('#wmap'), { rich: Object.keys(CITIES_BY_CODE), citiesOf: code => CITIES_BY_CODE[code] || [], onCountry: wmCountry, onCity: c => openCity(c), onClear: wmClear });
+    if (!WorldMap.ready || force) WorldMap.mount($('#wmap'), { cooked: Object.keys(passport()), rich: Object.keys(CITIES_BY_CODE), citiesOf: code => CITIES_BY_CODE[code] || [], onCountry: wmCountry, onCity: c => openCity(c), onClear: wmClear });
     else setTimeout(() => WorldMap.resize(), 50);
   } else {
     mp.classList.add('hide'); home.classList.remove('hide'); home.classList.remove('fade-in'); void home.offsetWidth; home.classList.add('fade-in');
@@ -500,8 +500,11 @@ function renderDotd() {
   const d = new Date(), idx = hash(d.toISOString().slice(0, 10) + 'dotd') % COUNTRIES.length, c = COUNTRIES[idx], rc = sigOf(c.code);
   $('#dotd').innerHTML = `<div class="dotd" role="button" data-open="c:${c.code}">${photo(c.code, c.wiki, c.emoji, true)}
     <div class="dotd-shade"></div><span class="dotd-tag">✨ ${t('dishOfDay')}</span>${heartBtn('dishes', c.code)}
-    <div class="dotd-b"><small>${flag(c.code)} ${esc(cname(c.code))}</small><h2>${esc(dishName(c))}</h2><span>⏱ ${fmtTime(rc.t)} · 🔥 ${kcalOf(c.code)} kcal · 📊 ${t(rc.d)}</span></div></div>`;
+    <div class="dotd-b"><small>${flag(c.code)} ${esc(cname(c.code))}</small><h2>${esc(dishName(c))}</h2><span>⏱ ${fmtTime(rc.t)} · 🔥 ${kcalOf(c.code)} kcal · 📊 ${t(rc.d)}</span></div></div>
+    ${questCard()}
+    <div class="menu-cta" role="button" id="menuCta"><span>🍽️</span><div><b>${t('menuTitle')}</b><small>${t('menuCta')}</small></div><span class="go">›</span></div>`;
   hydrate($('#dotd'));
+  $('#menuCta').onclick = () => openMenu();
 }
 function renderPopular() {
   const el = $('#popList'); if (!el) return;
@@ -593,7 +596,8 @@ function recipeHTML(rc, title) {
     <button class="btn primary block cook-btn" data-cook>👩‍🍳 ${t('startCooking')}</button>
     <div class="prog"><i class="rProg"></i></div>
     <div class="block"><h3>🧺 ${t('ingredients')} <small class="cnt">${rc.ing.length}</small></h3><ul class="ing">${rc.ing.map(x => `<li><span class="box">✓</span><span class="it">${esc(scaleLine(x, rc.cur / rc.s))}</span></li>`).join('')}</ul><p class="note">👆 ${t('tapHint')}</p>
-      <button class="btn line block shop-btn" data-shop>🛒 ${t('addMissing')}</button></div>
+      <button class="btn line block shop-btn" data-shop>🛒 ${t('addMissing')}</button>
+      ${rc.cat !== 't' && rc.key && /^[cr]/.test(rc.key) ? `<button class="btn ghost block shop-btn" data-menu>➕ ${t('addSide')}</button>` : ''}</div>
     <div class="block" style="animation-delay:.08s"><h3>🔥 ${t('steps')} <small class="cnt">${rc.st.length}</small></h3><ol class="steps">${rc.st.map((x, i) => `<li><span class="n">${i + 1}</span><span>${esc(x)}</span></li>`).join('')}</ol></div>`;
 }
 function saveScore(key, final, earned) {
@@ -618,8 +622,8 @@ function openKitchen(rc, name, extra) {
   const w = extra.wiki ? wikiCached(extra.wiki, 'en') : null;
   const local = extra.key && typeof LOCAL_PHOTOS !== 'undefined' && LOCAL_PHOTOS[extra.key];
   const chefId = currentChef(extra.code), ch = CHEFS[chefId];
-  Kitchen.open({ key: rc.key || name, chef: { id: chefId, name: ch.name[lang] || ch.name.tr }, name, country: extra.country || '', emoji: extra.emoji || '🍽️', img: local || (w && (w.big || w.img)) || null, ing: rc.ing.map(l => scaleLine(l, (rc.cur || rc.s) / rc.s)), st: rc.st, servings: rc.cur || rc.s, time: fmtTime(rc.t), nutri: rc.n || estimateNutrition(rc.ing, rc.s, rc.key) },
-    { t, esc, lang, pushPage, back, keepAwake, openSheet, toast, saveScore, voiceAuto: store.get('voiceAuto', false) });
+  Kitchen.open({ code: extra.code || '', key: rc.key || name, chef: { id: chefId, name: ch.name[lang] || ch.name.tr }, name, country: extra.country || '', emoji: extra.emoji || '🍽️', img: local || (w && (w.big || w.img)) || null, ing: rc.ing.map(l => scaleLine(l, (rc.cur || rc.s) / rc.s)), st: rc.st, servings: rc.cur || rc.s, time: fmtTime(rc.t), nutri: rc.n || estimateNutrition(rc.ing, rc.s, rc.key) },
+    { t, esc, lang, pushPage, back, keepAwake, openSheet, toast, saveScore, onCooked, voiceAuto: store.get('voiceAuto', false) });
 }
 function bindRecipe(el, rc, name, extra) {
   const upd = () => { const all = $$('.ing li,.steps li', el), d = all.filter(x => x.classList.contains('done')); $$('.rProg', el).forEach(p => p.style.width = (d.length / all.length * 100) + '%'); };
@@ -628,6 +632,7 @@ function bindRecipe(el, rc, name, extra) {
   const its = $$('.ing li .it', el);
   const setS = v => { rc.cur = Math.max(1, Math.min(60, v)); const f = rc.cur / rc.s; its.forEach((x, i) => { x.textContent = scaleLine(rc.ing[i], f); x.classList.remove('flash'); void x.offsetWidth; x.classList.add('flash'); }); $$('.svn', el).forEach(x => x.textContent = rc.cur); };
   $$('[data-sv]', el).forEach(b => b.onclick = () => setS(rc.cur + (+b.dataset.sv)));
+  $$('[data-menu]', el).forEach(b => b.onclick = () => openMenu(rc.key));
   $$('[data-shop]', el).forEach(b => b.onclick = () => { const n = addToShop(rc.ing.map(l => scaleLine(l, rc.cur / rc.s)), name); toast(n ? t('shopAdded', { n }) : t('shopNone')); });
 }
 /* ---------- shopping list ---------- */
@@ -1086,6 +1091,7 @@ function renderPantry() {
     <div class="top"><div><div class="hi">🧺 World Bite</div><h1>${t('pantryTitle')}</h1></div></div>
     <p class="hint">${t('pantryHint')}</p>
     <div class="trow"><label class="search">${I.search}<input id="pIn" placeholder="${t('addIng')}" autocomplete="off"></label><button class="icon-btn" id="pAdd">＋</button></div>
+    <button class="btn ghost block fridge-btn" id="pFridge">📸 ${t('fridgeTitle')}</button>
     <div class="picker" id="pPick"></div>
     <div class="basket" id="pBasket"><div class="b-head"><span class="b-ic" id="pBasketIc">🧺</span><b>${t('basket')}</b><small>${items.length}</small>${items.length ? `<button class="link sm" id="pClear">${t('clearAll')}</button>` : ''}</div>
       <div class="p-chips" id="pChips"></div></div>
@@ -1100,6 +1106,7 @@ function renderPantry() {
     <div id="pRes"></div>
     ${ai.length ? `<div class="sec"><h2>✨ ${t('recentAi')}</h2><small>${ai.length}</small></div><div id="pAiList">${ai.map((r, i) => aiRow(r, i)).join('')}</div>` : ''}`;
   drawChipsP(); drawPicker('');
+  $('#pFridge').onclick = fridgePhoto;
   const input = $('#pIn');
   input.oninput = () => drawPicker(input.value);
   input.onkeydown = e => { if (e.key === 'Enter') { const q = input.value.trim(); if (!q) return; const hit = searchIng(q)[0]; addPantry(hit && norm(hit.name[lang] || hit.name.tr) === norm(q) ? '#' + hit.id : q, null); input.value = ''; drawPicker(''); } };
@@ -1197,6 +1204,252 @@ function openAiRecipe(r) {
   });
 }
 
+/* ================= DINNER MENU: two dishes at once + drinks ================= */
+let _planAll = null;
+function planAll() {
+  if (_planAll) return _planAll;
+  const out = COUNTRIES.map(c => { const rc = sigOf(c.code); return { kind: 'c', id: c.code, name: dishName(c), emoji: c.emoji, wiki: c.wiki, country: c.code, cat: c.cat, ing: rc.ing, st: rc.st, stShow: rc.st, s: rc.s, key: 'c' + c.code }; });
+  RECIPES.forEach(r => out.push({ kind: 'r', id: r.id, name: recName(r), emoji: r.e, wiki: r.wiki, country: r.country, cat: r.cat, ing: r.ing.tr, st: r.st.tr, stShow: r.st[cl()], s: r.s, key: 'r' + r.id }));
+  out.forEach(x => { x.plan = planSteps(x.st); x.tot = totalMinutes(x.plan); x.pas = passiveWindow(x.plan); x.act = x.tot - x.pas; x.oven = x.plan.some(p => p.oven); });
+  return (_planAll = out);
+}
+const DRINK_WHY = { home: 'whyHome', red: 'whyRed', chicken: 'whyChicken', fish: 'whyFish', spicy: 'whySpicy', fried: 'whyFried', rice: 'whyRice', dessert: 'whyDessert', pastry: 'whyPastry', cheese: 'whyCheese', grill: 'whyGrill', curry: 'whySpicy', tortilla: 'whySpicy', breakfast: 'whyBreakfast', light: 'whyLight', rich: 'whyRich', meze: 'whyMeze', creamy: 'whyRich', tomato: 'whyRed', soup: 'whyRich', vegetarian: 'whyLight', any: 'whyLight' };
+const ageOk = () => ((store.get('session', {}) || {}).age || 0) >= 18;
+const alcoholAllowed = () => ageOk() && !store.get('diet', []).includes('halal') && !store.get('noAlcohol', false);
+function openMenu(preMainKey) {
+  const all = planAll(); const sel = { main: preMainKey ? all.find(x => x.key === preMainKey) : null, side: null, sideCat: 's' };
+  pushPage(`<div class="menu-head"><button class="round" data-back>${I.back}</button><div><small>🍽️ World Bite</small><h1>${t('menuTitle')}</h1></div></div>
+    <div class="dbody menu-body" id="mBody"></div>`, el => {
+    const body = $('#mBody', el);
+    const draw = () => {
+      const m = sel.main, sd = sel.side;
+      let html = `<div class="m-step ${m ? 'done' : 'on'}"><b>1</b><span>${t('menuPickMain')}</span></div>`;
+      if (!m) {
+        html += `<label class="search">${I.search}<input id="mQ" placeholder="${t('searchExplore')}" autocomplete="off"></label><div id="mList" class="m-list"></div>`;
+      } else {
+        html += menuCard(m, 'A') + `<button class="link" id="mChMain">${t('change')}</button>
+          <div class="m-step ${sd ? 'done' : 'on'}"><b>2</b><span>${t('menuPickSide')}</span></div>`;
+        if (!sd) {
+          html += `<div class="chips">${['s', 't'].map(c => `<button class="chip ${sel.sideCat === c ? 'on' : ''}" data-sc="${c}">${c === 's' ? '🥗 ' + t('saladMeze') : '🍰 ' + t('quickDessert')}</button>`).join('')}</div><div id="sList" class="m-list"></div>`;
+        } else {
+          const res = scheduleDual(m.plan, sd.plan);
+          html += menuCard(sd, 'B') + `<button class="link" id="mChSide">${t('change')}</button>
+            <div class="m-step on"><b>3</b><span>${t('menuPlan')}</span></div>
+            <div class="plan-sum"><div><b>${res.total}</b><small>${t('min')} ${t('together')}</small></div><div><b>${res.separate}</b><small>${t('min')} ${t('separately')}</small></div><div class="save"><b>${res.saved}</b><small>${t('min')} ${t('timeSaved')}</small></div></div>
+            ${timelineHTML(res, m, sd)}
+            <div class="m-step on"><b>4</b><span>🥤 ${t('drinkTitle')}</span></div><div id="mDrinks"></div>
+            <button class="btn primary block cta" id="mGo">👩‍🍳 ${t('cookTogether')}</button>
+            <button class="btn line block" id="mShare" style="margin-top:8px">📤 ${t('share')}</button>`;
+        }
+      }
+      body.innerHTML = html; hydrate(body);
+      if (!m) {
+        const q = $('#mQ', el), list = () => {
+          const nq = norm(q.value.trim());
+          const c = all.filter(x => x.cat !== 't' && x.pas >= 10 && x.pas <= 300 && (!nq || norm(x.name).includes(nq) || norm(cname(x.country)).includes(nq))).sort((a, b) => Math.abs(a.pas - 45) - Math.abs(b.pas - 45)).slice(0, 40);
+          $('#mList', el).innerHTML = c.map((x, i) => menuRow(x, `⏳ ${fmtTime(x.pas)} ${t('waitTime')}`, i)).join(''); hydrate($('#mList', el));
+          $$('[data-pick]', el).forEach(b => b.onclick = () => { sel.main = all.find(x => x.key === b.dataset.pick); draw(); });
+        };
+        q.oninput = list; list();
+      } else if (!sd) {
+        $('#mChMain', el).onclick = () => { sel.main = null; sel.side = null; draw(); };
+        $$('[data-sc]', el).forEach(b => b.onclick = () => { sel.sideCat = b.dataset.sc; draw(); });
+        const c = all.filter(x => x.cat === sel.sideCat && x.key !== m.key && x.tot <= 45 && !(x.oven && m.oven)).map(x => ({ x, fit: x.act <= m.pas })).sort((a, b) => (b.fit - a.fit) || a.x.tot - b.x.tot).slice(0, 30);
+        $('#sList', el).innerHTML = c.length ? c.map(({ x, fit }, i) => menuRow(x, fit ? `✓ ${t('fitsWait')}` : `⏱ ${fmtTime(x.tot)}`, i, fit)).join('') : `<div class="empty"><span class="e">🍽️</span>${t('noResults')}</div>`;
+        hydrate($('#sList', el));
+        $$('[data-pick]', el).forEach(b => b.onclick = () => { sel.side = all.find(x => x.key === b.dataset.pick); draw(); });
+      } else {
+        $('#mChMain', el).onclick = () => { sel.main = null; sel.side = null; draw(); };
+        $('#mChSide', el).onclick = () => { sel.side = null; draw(); };
+        drawDrinks($('#mDrinks', el), m, sd);
+        $('#mGo', el).onclick = () => startDual(m, sd);
+        $('#mShare', el).onclick = () => { const res = scheduleDual(m.plan, sd.plan); share(`🍽️ ${t('menuTitle')}: ${m.name} + ${sd.name}`, res.timeline.map(x => `${fmtClock(x.start)} ${x.dish === 'A' ? m.name : sd.name}: ${x.text}`).join('\n')); };
+      }
+    };
+    draw();
+  });
+}
+function menuRow(x, sub, i, fit) {
+  return `<div class="m-row ${fit ? 'fit' : ''}" role="button" data-pick="${x.key}" style="animation-delay:${Math.min(i, 12) * 0.03}s">${photo(x.kind === 'c' ? x.id : x.id, x.wiki, x.emoji)}<div class="b"><b>${esc(x.name)}</b><small>${flag(x.country)} ${esc(cname(x.country))} · ⏱ ${fmtTime(x.tot)}</small><small class="${fit ? 'okk' : ''}">${sub}</small></div></div>`;
+}
+function menuCard(x, lane) { return `<div class="m-card lane-${lane}">${photo(x.id, x.wiki, x.emoji)}<div class="b"><small>${lane === 'A' ? t('mainDish') : t('sideDish')}</small><b>${esc(x.name)}</b><small>${flag(x.country)} ${esc(cname(x.country))} · ⏱ ${fmtTime(x.tot)} · 🔥 ${estimateNutrition(x.ing, x.s, x.key).kcal} kcal</small></div></div>`; }
+const fmtClock = m => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+function timelineHTML(res, m, sd) {
+  const T = Math.max(1, res.total), bar = (x, cls) => `<i class="${cls}" style="left:${x.start / T * 100}%;width:${Math.max(1.5, x.active / T * 100)}%"></i>` + (x.passive ? `<i class="${cls} pas" style="left:${(x.start + x.active) / T * 100}%;width:${x.passive / T * 100}%"></i>` : '');
+  return `<div class="tl"><div class="tl-lane"><span class="tl-l A">A</span><div class="tl-track">${res.timeline.filter(x => x.dish === 'A').map(x => bar(x, 'A')).join('')}</div></div>
+    <div class="tl-lane"><span class="tl-l B">B</span><div class="tl-track">${res.timeline.filter(x => x.dish === 'B').map(x => bar(x, 'B')).join('')}</div></div>
+    <div class="tl-axis"><span>0:00</span><span>${fmtClock(Math.round(T / 2))}</span><span>${fmtClock(T)}</span></div>
+    <p class="note">▮ ${t('activeTime')} · ▯ ${t('passiveTime')}</p></div>`;
+}
+function drawDrinks(box, m, sd) {
+  const taste = store.get('taste', null);
+  if (!taste) {
+    const tq = { sweet: 1, body: 1, temp: 'any', fizzy: null };
+    const row = (k, opts) => `<div class="tq-row"><span>${t('tq_' + k)}</span><div class="chips">${opts.map(([v, l]) => `<button class="chip ${String(tq[k]) === String(v) ? 'on' : ''}" data-tk="${k}" data-tv="${v}">${l}</button>`).join('')}</div></div>`;
+    const paint = () => {
+      box.innerHTML = `<div class="tq"><p>${t('tasteAsk')}</p>${row('sweet', [[0, t('tq_low')], [1, t('tq_mid')], [2, t('tq_high')]])}${row('body', [[0, t('tq_light')], [1, t('tq_mid')], [2, t('tq_rich')]])}${row('temp', [['cold', '🧊 ' + t('tq_cold')], ['hot', '♨️ ' + t('tq_hot')], ['any', t('tq_any')]])}${row('fizzy', [[true, '🫧 ' + t('yes')], [false, t('no')], [null, t('tq_any')]])}
+        ${ageOk() && !store.get('diet', []).includes('halal') ? `<label class="tq-alc"><input type="checkbox" id="tqAlc" ${store.get('noAlcohol', false) ? '' : 'checked'}> ${t('tq_alcohol')}</label>` : ''}
+        <button class="btn primary block" id="tqOk">${t('cont')}</button></div>`;
+      $$('[data-tk]', box).forEach(b => b.onclick = () => { const v = b.dataset.tv; tq[b.dataset.tk] = v === 'null' ? null : v === 'true' ? true : v === 'false' ? false : isNaN(v) ? v : +v; paint(); });
+      $('#tqOk', box).onclick = () => { const a = $('#tqAlc', box); if (a) store.set('noAlcohol', !a.checked); store.set('taste', tq); drawDrinks(box, m, sd); };
+    };
+    paint(); return;
+  }
+  const prof = dishProfile(m.ing.concat(sd ? sd.ing : []), m.st, m.cat, m.country);
+  const list = pairDrinks(prof, taste, alcoholAllowed());
+  box.innerHTML = `<div class="drinks">${list.map((x, i) => `<div class="drink ${x.d.alc ? 'alc' : ''}" style="animation-delay:${i * .1}s"><span class="e">${x.d.emoji}</span><div><b>${esc(x.d.name[lang] || x.d.name.en)}</b><small>${x.d.alc ? '🔞 ' : ''}${[...new Set(x.why.slice(0, 2).map(w => t(DRINK_WHY[w] || 'whyLight')))].join(' · ') || t('whyLight')}</small></div></div>`).join('')}</div>
+    ${!ageOk() || store.get('diet', []).includes('halal') ? `<p class="note">${t('noAlcNote')}</p>` : ''}<button class="link" id="tqReset">${t('tasteChange')}</button>`;
+  $('#tqReset', box).onclick = () => { store.del('taste'); drawDrinks(box, m, sd); };
+}
+/* ---------- cook both together, with parallel timers ---------- */
+function startDual(m, sd) {
+  const res = scheduleDual(m.plan, sd.plan), steps = res.timeline.map(x => Object.assign({}, x, { show: (x.dish === 'A' ? m : sd).stShow[x.i] || x.text, done: false }));
+  let k = 0, timers = [], tick = null, t0 = Date.now();
+  const el = pushPage(`<div class="dual">
+    <div class="k-top"><button class="round" data-back>✕</button><div class="k-title"><b>${esc(m.name)} + ${esc(sd.name)}</b><small id="dClock">0:00 / ${fmtClock(res.total)}</small></div><button class="round" id="dVoice">🎙️</button></div>
+    <div class="d-timers" id="dTimers"></div>
+    <div class="d-now" id="dNow"></div>
+    <h4 class="d-next-h">${t('upNext')}</h4><div class="d-list" id="dList"></div></div>`, () => {}, 'dualpage');
+  if (!el) return;
+  keepAwake(true);
+  const name = d => d === 'A' ? m.name : sd.name;
+  const draw = () => {
+    const st = steps[k];
+    if (!st) {
+      $('#dNow', el).innerHTML = `<div class="d-card fin"><div class="big">🎉</div><h2>${t('bonApp')}</h2><p>${t('dualDone', { m: m.name, s: sd.name })}</p><button class="btn primary block" id="dFin">${t('finish')} ✓</button></div>`;
+      $('#dFin', el).onclick = () => back();
+      onCooked(m.country, m.name, 0, m.key); onCooked(sd.country, sd.name, 0, sd.key);
+      SFX.play('success'); if (Voice.on) Voice.speak(t('bonApp'));
+    } else {
+      $('#dNow', el).innerHTML = `<div class="d-card lane-${st.dish}"><div class="d-tag ${st.dish}">${st.dish} · ${esc(name(st.dish))}</div>
+        <small>⏰ ${fmtClock(st.start)} · ${t('stepOf', { i: k + 1, n: steps.length })}</small><p>${esc(st.show)}</p>
+        ${st.passive ? `<span class="k-tag c">⏳ ${t('thenWait', { n: st.passive })}</span>` : ''}
+        <button class="btn primary block" id="dDone">${st.passive ? '✓ ' + t('doneStartTimer', { n: st.passive }) : '✓ ' + t('doneNext')}</button></div>`;
+      $('#dDone', el).onclick = () => { if (st.passive) addTimer(st.passive * 60, name(st.dish), st.dish); st.done = true; k++; SFX.play('pop'); draw(); if (Voice.on) read(); };
+    }
+    $('#dList', el).innerHTML = steps.slice(k + 1, k + 6).map(x => `<div class="d-row"><span class="d-tag ${x.dish}">${x.dish}</span><small>${fmtClock(x.start)}</small><span>${esc(x.show)}</span></div>`).join('') || '';
+  };
+  const addTimer = (secs, label, dish) => { timers.push({ end: Date.now() + secs * 1000, label, dish, total: secs }); drawTimers(); };
+  const drawTimers = () => {
+    const now = Date.now();
+    $('#dTimers', el).innerHTML = timers.map((x, i) => { const left = Math.max(0, Math.round((x.end - now) / 1000)); return `<div class="d-timer ${x.dish} ${left === 0 ? 'ring' : ''}"><b>${left === 0 ? '✅' : '⏳'} ${esc(x.label)}</b><span>${left === 0 ? t('ready') : `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`}</span><i style="width:${(1 - left / x.total) * 100}%"></i>${left === 0 ? `<button data-tx="${i}">×</button>` : ''}</div>`; }).join('');
+    $$('[data-tx]', el).forEach(b => b.onclick = () => { timers.splice(+b.dataset.tx, 1); drawTimers(); });
+  };
+  tick = setInterval(() => {
+    const now = Date.now(); $('#dClock', el).textContent = `${fmtClock(Math.floor((now - t0) / 60000))} / ${fmtClock(res.total)}`;
+    timers.forEach(x => { if (!x.rang && now >= x.end) { x.rang = true; SFX.play('ding'); SFX.vibrate([300, 150, 300]); toast(t('timerDone', { n: x.label })); if (Voice.on) Voice.speak(t('timerDone', { n: x.label })); } });
+    drawTimers();
+  }, 1000);
+  const read = () => { const st = steps[k]; if (st) Voice.speak(`${name(st.dish)}. ${st.show}`); };
+  $('#dVoice', el).onclick = () => {
+    if (Voice.on) { Voice.stop(); $('#dVoice', el).classList.remove('on'); return; }
+    Voice.start(lang, cmd => { if (cmd === 'stop') { Voice.stop(); $('#dVoice', el).classList.remove('on'); } else if (cmd === 'next') { const b = $('#dDone', el); b && b.click(); } else if (cmd === 'repeat') read(); });
+    $('#dVoice', el).classList.add('on'); toast(t('voiceOn')); read();
+  };
+  el._onClose = () => { clearInterval(tick); keepAwake(false); Voice.stop(); };
+  draw();
+}
+
+/* ================= FRIDGE PHOTO → ingredients (Gemini vision) ================= */
+function fridgePhoto() {
+  if (!gemKey()) { toast(t('aiNeedKey')); setTab('settings'); return; }
+  openSheet(`<h2>📸 ${t('fridgeTitle')}</h2><p class="sub">${t('fridgeHint')}</p>
+    <div class="btn-row"><button class="btn primary" id="fCam">📷 ${t('camera')}</button><label class="btn line" for="fFile">🖼️ ${t('gallery')}</label></div>
+    <input type="file" id="fFile" accept="image/*" class="hide">`, s => {
+    $('#fCam', s).onclick = () => { closeSheet(); fridgeCamera(); };
+    $('#fFile', s).onchange = e => { const f = e.target.files[0]; if (!f) return; closeSheet(); const img = new Image(); img.onload = () => analyzeFridge(img); img.src = URL.createObjectURL(f); };
+  });
+}
+function fridgeCamera() {
+  const ov = document.createElement('div'); ov.className = 'k-cam'; ov.style.position = 'fixed'; ov.style.zIndex = 70;
+  ov.innerHTML = `<video autoplay playsinline muted></video><div class="k-cam-top"><button class="round" id="fx">✕</button><span>${t('fridgeHint')}</span></div><div class="k-cam-bot"><button class="k-shutter" id="fShot"></button></div>`;
+  document.body.appendChild(ov);
+  let stream = null; const vid = ov.querySelector('video');
+  const close = () => { if (stream) stream.getTracks().forEach(tr => tr.stop()); ov.remove(); };
+  ov.querySelector('#fx').onclick = close;
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } } }).then(s => { stream = s; vid.srcObject = s; }).catch(() => { close(); toast(t('camErr')); });
+  ov.querySelector('#fShot').onclick = () => { if (!vid.videoWidth) return; SFX.play('pop'); const c = document.createElement('canvas'); c.width = vid.videoWidth; c.height = vid.videoHeight; c.getContext('2d').drawImage(vid, 0, 0); close(); analyzeFridge(c); };
+}
+async function analyzeFridge(src) {
+  const W = src.videoWidth || src.naturalWidth || src.width, H = src.videoHeight || src.naturalHeight || src.height, k = Math.min(1, 1024 / Math.max(W, H));
+  const c = document.createElement('canvas'); c.width = Math.round(W * k); c.height = Math.round(H * k); c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+  const b64 = c.toDataURL('image/jpeg', .82).split(',')[1];
+  openSheet(`<h2>📸 ${t('fridgeTitle')}</h2><img class="f-prev" src="data:image/jpeg;base64,${b64}"><div class="ai-wait"><div class="ai-orb">✨</div><p>${t('fridgeWorking')}</p></div>`);
+  try {
+    const prompt = `List every food ingredient you can clearly see in this photo of a fridge, pantry or countertop. Ignore non-food items. Reply ONLY with JSON: {"items":[{"en":"english name, singular, lowercase","name":"name in ${LANG_NAME[lang]}"}]}`;
+    const j = await gemini({ contents: [{ role: 'user', parts: [{ inline_data: { mime_type: 'image/jpeg', data: b64 } }, { text: prompt }] }], generationConfig: { responseMimeType: 'application/json' } }, 45000);
+    const items = (gemJSON(gemText(j)).items || []).map(x => {
+      const en = norm(x.en || ''), it = INGREDIENTS.find(i => norm(i.name.en) === en || norm(i.name.en).replace(/s$/, '') === en || en.includes(norm(i.name.en).replace(/s$/, '')));
+      return it ? { v: '#' + it.id, label: it.name[lang] || it.name.tr, icon: it.emoji, it } : { v: x.name || x.en, label: x.name || x.en, icon: ingEmoji(x.name || x.en) };
+    }).filter((x, i, a) => x.v && a.findIndex(y => y.v === x.v) === i);
+    const sel = new Set(items.map(x => x.v));
+    const paint = () => {
+      $('#sheet').innerHTML = `<div class="grab"></div><h2>📸 ${t('fridgeFound', { n: items.length })}</h2><p class="sub">${t('fridgePick')}</p>
+        <div class="ptiles f-tiles">${items.map(x => `<button class="ptile ${sel.has(x.v) ? 'in' : ''}" data-fv="${esc(x.v)}">${x.it ? photo('ing-' + x.it.id, x.it.wiki, x.icon) : `<div class="ph"><span class="em">${x.icon}</span></div>`}<b>${esc(x.label)}</b></button>`).join('')}</div>
+        <button class="btn primary block" id="fAdd" style="margin-top:12px">🧺 ${t('fridgeAdd', { n: sel.size })}</button>`;
+      hydrate($('#sheet'));
+      $$('[data-fv]', $('#sheet')).forEach(b => b.onclick = () => { const v = b.dataset.fv; sel.has(v) ? sel.delete(v) : sel.add(v); paint(); });
+      $('#fAdd').onclick = () => { const p = pantry(); sel.forEach(v => { if (!p.includes(v)) p.push(v); }); store.set('pantry', p); pantryResults = null; closeSheet(); SFX.play('success'); renderPantry(); toast(t('fridgeAdded', { n: sel.size })); };
+    };
+    if (!items.length) { $('#sheet').innerHTML = `<div class="grab"></div><div class="empty"><span class="e">🤔</span>${t('fridgeNone')}</div>`; return; }
+    paint();
+  } catch (e) { $('#sheet').innerHTML = `<div class="grab"></div><div class="empty"><span class="e">⚠️</span>${t('aiErr')}<br><small>${esc(String(e.message || e).slice(0, 140))}</small></div>`; }
+}
+
+/* ================= PASSPORT, COSTUMES, DAILY QUEST ================= */
+const passport = () => store.get('passport', {});
+const todayKey = () => new Date().toISOString().slice(0, 10);
+function dotdCode() { const c = COUNTRIES[hash(todayKey() + 'dotd') % COUNTRIES.length]; return c.code; }
+function onCooked(code, dish, stars, key) {
+  if (!code) return;
+  const p = passport(), isNew = !p[code];
+  p[code] = { ts: Date.now(), dish, stars: Math.max(stars || 0, (p[code] && p[code].stars) || 0) }; store.set('passport', p);
+  if (isNew) setTimeout(() => toast(`🛂 ${t('stamped', { c: cname(code) })}`), 600);
+  const q = store.get('quest', { date: '', done: false, streak: 0, last: '' });
+  if (code === dotdCode() && !(q.date === todayKey() && q.done)) {
+    const y = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+    q.streak = q.last === y ? q.streak + 1 : 1; q.last = todayKey(); q.date = todayKey(); q.done = true; store.set('quest', q);
+    const g = store.get('gstats', { total: 0, best: {}, games: 0 }); g.total += 5; store.set('gstats', g);
+    setTimeout(() => { toast(`🏆 ${t('questDone', { n: q.streak })}`); SFX.play('success'); }, 1500);
+  }
+  newAccessories();
+}
+const ACCESSORIES = [
+  { id: 'scarf', e: '🧣', slot: 'neck', need: p => contCount(p, 'europe') >= 3, rule: ['europe', 3] },
+  { id: 'fan', e: '🪭', slot: 'hand', need: p => contCount(p, 'asia') >= 3, rule: ['asia', 3] },
+  { id: 'bow', e: '🎀', slot: 'head', need: p => contCount(p, 'africa') >= 2, rule: ['africa', 2] },
+  { id: 'shades', e: '🕶️', slot: 'eyes', need: p => contCount(p, 'americas') >= 3, rule: ['americas', 3] },
+  { id: 'flower', e: '🌺', slot: 'head', need: p => contCount(p, 'oceania') >= 1, rule: ['oceania', 1] },
+  { id: 'tophat', e: '🎩', slot: 'top', need: p => Object.keys(p).length >= 10, rule: ['all', 10] },
+  { id: 'sunhat', e: '👒', slot: 'top', need: p => Object.keys(p).length >= 25, rule: ['all', 25] },
+  { id: 'crown', e: '👑', slot: 'top', need: p => Object.keys(p).length >= 50, rule: ['all', 50] }
+];
+function contCount(p, cont) { return Object.keys(p).filter(c => byCode[c] && byCode[c].cont === cont).length; }
+function newAccessories() {
+  const p = passport(), seen = store.get('accSeen', []);
+  ACCESSORIES.filter(a => a.need(p) && !seen.includes(a.id)).forEach(a => { seen.push(a.id); setTimeout(() => toast(`🎁 ${t('accUnlocked')} ${a.e}`), 2600); });
+  store.set('accSeen', seen);
+}
+function questCard() {
+  const code = dotdCode(), c = byCode[code], q = store.get('quest', { date: '', done: false, streak: 0 }), done = q.date === todayKey() && q.done;
+  return `<div class="quest ${done ? 'done' : ''}" role="button" data-open="c:${code}"><span class="qi">${done ? '✅' : '🏆'}</span><div><b>${t('questTitle')}</b><small>${done ? t('questDoneShort') : t('questText', { d: dishName(c) })}</small></div><span class="qs">🔥 ${q.streak || 0}</span></div>`;
+}
+function openPassport() {
+  const p = passport(), codes = Object.keys(p).sort((a, b) => p[b].ts - p[a].ts), acc = store.get('acc', '');
+  pushPage(`<div class="menu-head"><button class="round" data-back>${I.back}</button><div><small>🛂 World Bite</small><h1>${t('passport')}</h1></div></div>
+    <div class="dbody menu-body">
+      <div class="pp-cover"><div class="pp-emb">${logoSVG(false)}</div><div><b>${esc(session().name)}</b><small>${t('ppStats', { n: codes.length, t: COUNTRIES.length })}</small></div></div>
+      <div class="pp-conts">${CONTINENTS.map(ct => { const n = contCount(p, ct), tot = COUNTRIES.filter(c => c.cont === ct).length; return `<div><span>${t(ct)}</span><i><b style="width:${n / tot * 100}%"></b></i><small>${n}/${tot}</small></div>`; }).join('')}</div>
+      <div class="sec"><h2>🎭 ${t('costumes')}</h2></div>
+      <div class="acc-grid">${ACCESSORIES.map(a => { const ok = a.need(p); return `<button class="acc ${ok ? '' : 'lock'} ${acc === a.id ? 'on' : ''}" data-acc="${ok ? a.id : ''}"><span>${ok ? a.e : '🔒'}</span><small>${ok ? (acc === a.id ? t('wearing') : t('wear')) : (a.rule[0] === 'all' ? t('ruleAll', { n: a.rule[1] }) : t('ruleCont', { n: a.rule[1], c: t(a.rule[0]) }))}</small></button>`; }).join('')}</div>
+      <div class="chef-preview">${chefHTML(currentChef(), 'happy')}</div>
+      <div class="sec"><h2>📮 ${t('stamps')}</h2><small>${codes.length}</small></div>
+      <div class="stamps">${codes.map((c, i) => `<div class="stamp" role="button" data-open="c:${c}" style="--r:${(hash(c) % 20) - 10}deg;animation-delay:${Math.min(i, 20) * .05}s"><span class="f">${flag(c)}</span><b>${esc(cname(c))}</b><small>${esc(p[c].dish || '')}</small><i>${new Date(p[c].ts).toLocaleDateString(lang)}</i></div>`).join('') || `<div class="empty" style="grid-column:1/-1"><span class="e">🛂</span>${t('ppEmpty')}</div>`}</div>
+    </div>`, el => {
+    $$('[data-acc]', el).forEach(b => b.onclick = () => { if (!b.dataset.acc) { SFX.play('fail'); return; } store.set('acc', store.get('acc', '') === b.dataset.acc ? '' : b.dataset.acc); SFX.play('pop'); back(); setTimeout(openPassport, 280); });
+  });
+}
+
 /* ---------- MY LIST ---------- */
 let listTab = 'recipes';
 function renderList() {
@@ -1253,11 +1506,12 @@ function renderSettings() {
   $('#v-settings').innerHTML = `<div class="top"><div><div class="hi">⚙️ World Bite</div><h1>${t('settings')}</h1></div></div>
     <div class="profile"><div class="avatar">${esc((s.name[0] || '?').toUpperCase())}</div><div><h3>${esc(s.name)}</h3><small>${esc(s.email || '')} · ${t('provider')[s.provider] || ''}</small></div></div>
     <div class="group"><h4>👩‍🍳 ${t('chefTitle')}</h4>
-      <div class="chef-pick">${Object.values(CHEFS).map(ch => `<button class="chef-card ${currentChef() === ch.id ? 'on' : ''}" data-chef="${ch.id}">${chefSVG(ch.id, currentChef() === ch.id ? 'wink' : 'happy')}<b>${esc(ch.name[lang] || ch.name.tr)}</b><small>${esc(ch.tag[lang] || ch.tag.tr)}</small></button>`).join('')}</div>
+      <div class="chef-pick">${Object.values(CHEFS).map(ch => `<button class="chef-card ${currentChef() === ch.id ? 'on' : ''}" data-chef="${ch.id}">${currentChef() === ch.id ? chefHTML(ch.id, 'wink') : chefSVG(ch.id, 'happy')}<b>${esc(ch.name[lang] || ch.name.tr)}</b><small>${esc(ch.tag[lang] || ch.tag.tr)}</small></button>`).join('')}</div>
       <div class="chips" style="padding:0 16px 8px;margin:0">${['age', 'dish', 'random'].map(m => `<button class="chip ${store.get('chefMode', 'age') === m ? 'on' : ''}" data-cm="${m}">${t('chef_' + m)}</button>`).join('')}</div>
       ${(g => `<div class="rank-card"><span>🏅</span><div><b>${rankInfo(g.total).rankName}</b><small>${g.total} ★ · ${g.games} ${t('gamesPlayed')}</small><div class="g-rank"><i style="width:${rankInfo(g.total).progress}%"></i></div></div></div>`)(store.get('gstats', { total: 0, games: 0 }))}
       <div class="row" id="sSfx"><span class="ri">🔊</span><span class="lbl">${t('sfxToggle')}</span><span class="toggle ${store.get('sfx', true) ? 'on' : ''}" style="flex:none"></span></div>
       <div class="row" id="sVoiceAuto"><span class="ri">🎙️</span><span class="lbl">${t('voiceAuto')}</span><span class="toggle ${store.get('voiceAuto', false) ? 'on' : ''}" style="flex:none"></span></div>
+      <button class="row" id="sPass"><span class="ri">🛂</span><span class="lbl">${t('passport')}</span><small>${Object.keys(passport()).length}/${COUNTRIES.length}</small>${I.chev}</button>
       <button class="row" id="sAge"><span class="ri">🎂</span><span class="lbl">${t('age')}</span><small>${s.age || '—'}</small>${I.chev}</button></div>
     <div class="group"><h4>🥗 ${t('dietTitle')}</h4><div class="chips" style="padding:6px 16px 4px;margin:0;flex-wrap:wrap">${DIETS.map(k => `<button class="chip ${store.get('diet', []).includes(k) ? 'on' : ''}" data-sd="${k}">${DIET_ICON[k]} ${t('diet_' + k)}</button>`).join('')}</div><p class="credits" style="padding-top:8px">${t('dietNote')}</p></div>
     <div class="group"><h4>${t('themeColor')}</h4><div class="swatches">${SWATCHES.map(c => `<button class="sw ${c.toLowerCase() === color.toLowerCase() ? 'on' : ''}" data-c="${c}" style="background:${c}"></button>`).join('')}
@@ -1275,10 +1529,11 @@ function renderSettings() {
       <button class="row" id="sIntro"><span class="ri">${I.replay}</span><span class="lbl">${t('replayIntro')}</span>${I.chev}</button>
       <button class="row" id="sCache"><span class="ri">${I.trash}</span><span class="lbl">${t('clearCache')}</span>${I.chev}</button>
       <button class="row danger" id="sOut"><span class="ri">${I.logout}</span><span class="lbl">${t('logout')}</span></button></div>
-    <div class="group"><h4>${t('about2')}</h4><div class="row"><span class="ri">${I.info}</span><span class="lbl">World Bite</span><small>${t('version')} 1.5.0</small></div><p class="credits">${t('credits')}</p></div>`;
+    <div class="group"><h4>${t('about2')}</h4><div class="row"><span class="ri">${I.info}</span><span class="lbl">World Bite</span><small>${t('version')} 1.6.0</small></div><p class="credits">${t('credits')}</p></div>`;
   $$('[data-chef]').forEach(b => b.onclick = () => { store.set('chefMode', b.dataset.chef); renderSettings(); });
   $$('[data-cm]').forEach(b => b.onclick = () => { store.set('chefMode', b.dataset.cm); renderSettings(); });
   $('#sAge').onclick = () => askAge(true);
+  $('#sPass').onclick = openPassport;
   $('#sSfx').onclick = () => { store.set('sfx', !store.get('sfx', true)); renderSettings(); SFX.play('ding'); };
   $('#sVoiceAuto').onclick = () => { store.set('voiceAuto', !store.get('voiceAuto', false)); renderSettings(); };
   $$('[data-sd]').forEach(b => b.onclick = () => { toggleDiet(b.dataset.sd); b.classList.toggle('on'); drawChips && $('#dietChips') && (drawChips(), drawGrid()); });

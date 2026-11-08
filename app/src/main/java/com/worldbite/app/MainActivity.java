@@ -15,6 +15,7 @@ import android.os.Environment;
 import android.provider.MediaStore;
 import android.util.Base64;
 import android.webkit.PermissionRequest;
+import android.webkit.ValueCallback;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Locale;
@@ -46,6 +47,8 @@ public class MainActivity extends Activity {
     private static final int REQ_CAMERA = 43;
     private PermissionRequest pendingCamera;
     private static final int REQ_MIC = 44;
+    private static final int REQ_FILE = 45;
+    private ValueCallback<Uri[]> fileCallback;
     private TextToSpeech tts;
     private boolean ttsReady = false;
     private SpeechRecognizer recognizer;
@@ -113,6 +116,15 @@ public class MainActivity extends Activity {
             }
 
             @Override
+            public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
+                if (fileCallback != null) fileCallback.onReceiveValue(null);
+                fileCallback = callback;
+                try { startActivityForResult(params.createIntent(), REQ_FILE); }
+                catch (Exception e) { fileCallback = null; return false; }
+                return true;
+            }
+
+            @Override
             public void onPermissionRequest(final PermissionRequest request) {
                 runOnUiThread(() -> {
                     boolean wantsCamera = false;
@@ -164,6 +176,15 @@ public class MainActivity extends Activity {
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(i);
         } catch (ActivityNotFoundException ignored) { }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_FILE && fileCallback != null) {
+            fileCallback.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data));
+            fileCallback = null;
+        }
     }
 
     private void js(final String code) { runOnUiThread(() -> { if (web != null) web.evaluateJavascript(code, null); }); }

@@ -20,6 +20,10 @@
 | Ülke sayfası | İmza yemek, fotoğraf, güçlü olduğu alan (kahvaltı / ana yemek / ara sıcak / tatlı), hikaye, açıklama |
 | Seyahat | Önce konum izni; yakındaki restoranlar uygulama içinde liste + vektör harita (MapLibre/OpenFreeMap). Gemini anahtarı varsa Google Haritalar puan ve yorumlarıyla. Tüm aramalar telefonda saklanır |
 | Pişirme oyunu | Şef karakterli oyun modu: malzemeleri sürükle-bırak, yumurtayı zamanında kır, daire çizerek çırp, ritimle doğra, yoğur/aç, ateşi yeşil bölgede tut, fırın kadranını ayarla, süsle; adım başına 1-3 yıldız, rütbeler (Çırak → Büyük Şef), ses efektleri |
+| Akşam menüsü | Ana yemek + salata/tatlı; bekleme sürelerine göre birleşik zaman çizelgesi (fırın çakışması kontrolü), eşzamanlı sayaçlarla birlikte pişirme |
+| İçecek eşleştirme | Damak tadı soruları + yemeğe göre 30 içecek; alkollü öneriler sadece 18+ ve helal tercihi kapalıyken |
+| Buzdolabı fotoğrafı | Kamera ya da galeriden foto → Gemini malzemeleri tanır → Elimdekiler'e eklenir |
+| Pasaport & kostümler | Pişirilen ülkelere damga, haritada yeşil; kıta/ülke sayısına göre şef aksesuarları; günün görevi ve seri |
 | Sesli asistan | Adımları sesli okur; "sonraki / geri / tekrar / zamanlayıcı / dur" komutları (TR, AZ, EN, RU) |
 | Mutfak animasyonu | Her tarif için: malzemeler kaba uçar ve listeden çıkar, yumurta kırma, çırpma, doğrama, kızartma, kaynatma, fırın; kıvam bilgisi, süre ve zamanlayıcı, atla, servis sunumu, kamerada "masada gör" |
 | Elimdekiler | Görselli malzeme seçici (160 ürün, 7 kategori, 4 dil, yazınca öneri), eşleşen tarifler (% eşleşme, eksikler) + Gemini ile özel tarif |

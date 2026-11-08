@@ -34,7 +34,8 @@ const WorldMap = (() => {
     if (!supported()) return false;
     const fc = await loadGeo();
     const rich = new Set(opts.rich || []);
-    fc.features.forEach(f => (f.properties.rich = rich.has(f.id) ? 1 : 0));
+    const cooked = new Set(opts.cooked || []);
+    fc.features.forEach(f => { f.properties.rich = rich.has(f.id) ? 1 : 0; f.properties.cooked = cooked.has(f.id) ? 1 : 0; });
     const c = colors();
     if (map) { try { map.remove(); } catch (e) {} map = null; }
     map = new maplibregl.Map({
@@ -43,7 +44,7 @@ const WorldMap = (() => {
       style: { version: 8, sources: { world: { type: 'geojson', data: fc, promoteId: 'iso', tolerance: 0.45 } }, layers: [
         { id: 'sea', type: 'background', paint: { 'background-color': c.sea } },
         { id: 'land', type: 'fill', source: 'world', paint: {
-          'fill-color': ['case', ['boolean', ['feature-state', 'sel'], false], '#E5484D', ['boolean', ['feature-state', 'hover'], false], c.p, ['==', ['get', 'rich'], 1], c.rich, c.land],
+          'fill-color': ['case', ['boolean', ['feature-state', 'sel'], false], '#E5484D', ['boolean', ['feature-state', 'hover'], false], c.p, ['==', ['get', 'cooked'], 1], '#86EFAC', ['==', ['get', 'rich'], 1], c.rich, c.land],
           'fill-opacity': ['case', ['boolean', ['feature-state', 'sel'], false], 0.92, ['boolean', ['feature-state', 'hover'], false], 0.35, 1],
           'fill-color-transition': { duration: 500 }, 'fill-opacity-transition': { duration: 500 } } },
         { id: 'border', type: 'line', source: 'world', paint: { 'line-color': c.line, 'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.4, 6, 1.2] } },

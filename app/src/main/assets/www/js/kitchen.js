@@ -265,7 +265,7 @@ const Kitchen = (() => {
       $$('.k-chip', el).forEach((c, i) => { c.style.animationDelay = (i * 0.07) + 's'; c.classList.add('pop'); });
       $('#kItems').innerHTML = `<div class="k-mise">${items.slice(0, 8).map((x, i) => `<span style="animation-delay:${i * 0.12}s">${x.emoji}</span>`).join('')}</div>`;
       const n = R.nutri;
-      $('#kCard').innerHTML = `${R.chef ? `<div class="k-chef"><div class="k-chef-av">${chefSVG(R.chef.id, 'happy')}</div><div class="bubble">${esc(t('chefHello', { n: R.chef.name }))}</div></div>` : ''}<div class="k-intro"><h2>${t('miseTitle')}</h2><p>${t('miseText', { n: items.length, s: steps.length })}</p>
+      $('#kCard').innerHTML = `${R.chef ? `<div class="k-chef"><div class="k-chef-av">${chefHTML(R.chef.id, 'happy')}</div><div class="bubble">${esc(t('chefHello', { n: R.chef.name }))}</div></div>` : ''}<div class="k-intro"><h2>${t('miseTitle')}</h2><p>${t('miseText', { n: items.length, s: steps.length })}</p>
         <div class="k-meta"><span>⏱ ${R.time || ''}</span><span>👥 ${R.servings} ${t('servings')}</span>${n ? `<span>🔥 ${n.kcal} kcal</span>` : ''}</div></div>`;
       $('#kNav').innerHTML = `<button class="btn primary k-go" id="kGameBtn">🎮 ${t('gameMode')}</button><button class="btn ghost" id="kStart">👩‍🍳 ${t('realMode')}</button>`;
       $('#kGameBtn').onclick = () => startMode('game');
@@ -321,15 +321,17 @@ const Kitchen = (() => {
     function stopTimer() { if (timer) { clearInterval(timer.iv); timer.ov.remove(); timer = null; } }
 
     /* ---------- serving / plating ---------- */
+    let stamped = false;
     function serve() {
       idx = steps.length; playing = null;
+      if (mode === 'real' && !stamped && ctx.onCooked) { stamped = true; ctx.onCooked(R.code, R.name, 0, R.key); }
       $('#kBar').style.width = '100%'; $('#kSub').textContent = t('serving');
       setVessel('plate'); $('#kItems').innerHTML = ''; $('#kFx').innerHTML = effectHTML('garnish', 'plate');
       $('#kBadge').innerHTML = `<span>🍽️ ${L.serve}</span>`;
       items.forEach(x => x.used = true); drawTray();
       $('#kStage').classList.add('served');
       $('#kItems').innerHTML = plateHTML('k-plated');
-      $('#kCard').innerHTML = `${R.chef ? `<div class="k-chef"><div class="k-chef-av">${chefSVG(R.chef.id, 'wink')}</div><div class="bubble">${esc(t('chefDone'))}</div></div>` : ''}<div class="k-step"><div class="k-act">🎉 ${t('bonApp')}</div>
+      $('#kCard').innerHTML = `${R.chef ? `<div class="k-chef"><div class="k-chef-av">${chefHTML(R.chef.id, 'wink')}</div><div class="bubble">${esc(t('chefDone'))}</div></div>` : ''}<div class="k-step"><div class="k-act">🎉 ${t('bonApp')}</div>
         <p>${esc(servingText || t('serveDefault'))}</p>
         ${sides.length ? `<div class="k-tags"><span class="k-tag c">🍽️ <b>${t('serveWith')}:</b> ${esc(sides.join(', '))}</span></div>` : ''}</div>`;
       $('#kNav').innerHTML = `<button class="btn line" id="kAgain">↺</button><button class="btn ghost" id="kCam">📷 ${t('seeOnTable')}</button><button class="btn primary" id="kDone">${t('finish')} ✓</button>`;
@@ -410,13 +412,13 @@ const Kitchen = (() => {
     function chefShow(act, mood) {
       const c = $('#kChef'); if (!R.chef || !c) return;
       c.classList.remove('hide'); c.dataset.act = act || 'idle';
-      c.innerHTML = `<div class="g-body">${chefSVG(R.chef.id, mood || 'happy')}</div><div class="g-arm"><span class="g-tool">${CHEF_TOOL[act] || '🥄'}</span></div>`;
+      c.innerHTML = `<div class="g-body">${chefHTML(R.chef.id, mood || 'happy')}</div><div class="g-arm"><span class="g-tool">${CHEF_TOOL[act] || '🥄'}</span></div>`;
     }
     function say(key, vars, mood, speakIt) {
       const b = $('#kBubble'); if (!b) return;
       const txt = key.startsWith('!') ? key.slice(1) : chefLine(key, ctx.lang, vars);
       b.textContent = txt; b.classList.remove('hide', 'pop2'); void b.offsetWidth; b.classList.add('pop2');
-      if (mood) { const body = $('#kChef .g-body'); if (body) body.innerHTML = chefSVG(R.chef.id, mood); }
+      if (mood) { const body = $('#kChef .g-body'); if (body) body.innerHTML = chefHTML(R.chef.id, mood); }
       if (speakIt !== false && Voice.on) Voice.speak(txt);
     }
     function meter(label) {
@@ -682,6 +684,7 @@ const Kitchen = (() => {
       gtoken = {}; serve();
       const tot = stars.reduce((a, b) => a + b, 0), max = steps.length * 3, pct = tot / max, final = pct >= .85 ? 3 : pct >= .6 ? 2 : 1;
       const res = ctx.saveScore ? ctx.saveScore(R.key || R.name, final, tot) : null;
+      if (!stamped && ctx.onCooked) { stamped = true; ctx.onCooked(R.code, R.name, final, R.key); }
       chefShow('serve', 'wink'); say('done', null, 'wink');
       SFX.play('success');
       $('#kCard').insertAdjacentHTML('afterbegin', `<div class="g-result"><div class="g-big">${[1, 2, 3].map(k => `<span class="${k <= final ? 'on' : ''}" style="animation-delay:${k * .18}s">★</span>`).join('')}</div>
