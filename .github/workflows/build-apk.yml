@@ -3,6 +3,7 @@ name: Build APK
 on:
   push:
     branches: [ main ]
+    paths-ignore: [ 'kitchen-lab/**', '.github/workflows/build-lab.yml' ]
   workflow_dispatch:
 
 permissions:

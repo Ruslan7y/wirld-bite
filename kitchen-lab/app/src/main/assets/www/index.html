@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>World Bite · Kitchen Lab</title>
+<link rel="stylesheet" href="css/lab.css">
+<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js" } }</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="touch"></div>
+<div class="vignette"></div>
+<canvas id="grain" width="160" height="160"></canvas>
+<div class="bars"><i></i><i></i></div>
+
+<div id="loading"><div class="ld-ring"></div><p>Mutfak hazırlanıyor…</p></div>
+
+<!-- HUD -->
+<div id="hud" class="hide">
+  <div class="top">
+    <button class="ic" id="bExit" aria-label="Çık">✕</button>
+    <div class="stepbox"><div class="stepn" id="stepN">1 / 14</div><div class="stept" id="stepT">Hazırlık</div>
+      <div class="prog"><i id="progBar"></i></div></div>
+    <button class="ic" id="bIng" aria-label="Malzemeler">📋</button>
+    <button class="ic" id="bSound" aria-label="Ses">🔊</button>
+  </div>
+  <div id="badge" class="badge"></div>
+  <div id="timer" class="timer hide"><div class="tm-ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="54"/><circle id="tmArc" cx="60" cy="60" r="54"/></svg><div><b id="tmTxt">35:00</b><small id="tmSub">175°C · fırın</small></div></div>
+    <div class="tm-btns"><button id="tmFast">⏩ Hızlandır</button></div></div>
+  <div class="bottom">
+    <div id="caption" class="caption"></div>
+    <div id="hint" class="hint hide"><div class="gest" id="gest"></div><span id="hintT"></span></div>
+    <div class="ctrl"><button id="bSkip" class="ghost">Atla ⏭</button></div>
+  </div>
+</div>
+
+<!-- Start -->
+<div id="start" class="panel hide">
+  <div class="st-card">
+    <div class="kicker">WORLD BITE · KITCHEN LAB</div>
+    <h1>Çilekli Vanilyalı Kek</h1>
+    <div class="meta"><span>⏱ 1 sa 5 dk</span><span>🍰 8 dilim</span><span>⭐ Kolay</span></div>
+    <div class="chips" id="chips"></div>
+    <button class="primary" id="bWatch">▶ Film gibi izle</button>
+    <button class="secondary" id="bPlay">👩‍🍳 Kendin yap</button>
+    <p class="note">Gerçek zamanlı 3D sahne · sesli · internetsiz</p>
+  </div>
+</div>
+
+<!-- End -->
+<div id="end" class="panel hide">
+  <div class="st-card">
+    <div class="big">🍰</div>
+    <h1>Afiyet olsun!</h1>
+    <p id="endTxt" class="sub"></p>
+    <button class="primary" id="bAgain">↺ Baştan izle</button>
+    <button class="secondary" id="bFree">🎥 Kameraya dokun ve döndür</button>
+  </div>
+</div>
+
+<!-- Ingredients sheet -->
+<div id="sheet" class="sheet hide"><div class="sh-card"><h3>Malzemeler</h3><ul id="ingList"></ul><button class="secondary" id="bShClose">Kapat</button></div></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

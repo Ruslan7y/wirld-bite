@@ -1,0 +1,44 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.worldbite.kitchenlab'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.worldbite.kitchenlab"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "0.1.0"
+    }
+
+    signingConfigs {
+        // Demo-only key so every new APK installs over the previous one.
+        // Before publishing to Google Play, create a private key and keep it in GitHub Secrets.
+        demo {
+            storeFile file('demo-keystore.jks')
+            storePassword 'worldbite-demo'
+            keyAlias 'worldbite'
+            keyPassword 'worldbite-demo'
+        }
+    }
+
+    buildTypes {
+        debug { signingConfig signingConfigs.demo }
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.demo
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.11.0'
+}

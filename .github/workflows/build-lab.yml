@@ -1,0 +1,53 @@
+name: Build Kitchen Lab APK
+
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'kitchen-lab/**', '.github/workflows/build-lab.yml' ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: kitchen-lab
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK
+        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build APK
+        run: gradle assembleRelease --no-daemon --stacktrace
+
+      - name: Rename APK
+        run: cp app/build/outputs/apk/release/app-release.apk ../KitchenLab.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KitchenLab-apk
+          path: KitchenLab.apk
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: lab-v0.${{ github.run_number }}
+          name: Kitchen Lab v0.${{ github.run_number }} (test)
+          body: |
+            🎂 **World Bite Kitchen Lab**: gerçekçi 3D pişirme animasyonu test uygulaması (World Bite'tan ayrı kurulur).
+          files: KitchenLab.apk
+          make_latest: false
+          prerelease: true
