@@ -212,9 +212,14 @@ const OPS = {
 };
 
 export async function playStep(c, st, i, plan, title) {
-  c.shot('front', 0.8); c.ch.look(V(0, 0.5, 2));
-  if (st.text) await c.say(st.text, i === plan.steps.length - 1 ? '' : `Tarif adımı ${i + 1} / ${plan.steps.length}`);
-  for (const op of st.ops) { if (OPS[op.op]) await OPS[op.op](c, op, st, i, plan); }
+  c.shot('front', 0.6); c.ch.look(V(0, 0.5, 2));
+  // the chef reads the step while she already starts doing it (lines inside actions wait for the reading)
+  const reading = st.text ? c.say(st.text, i === plan.steps.length - 1 ? '' : `Tarif adımı ${i + 1} / ${plan.steps.length}`) : Promise.resolve();
+  const cc = Object.create(c);
+  cc.say = (...a) => reading.catch(() => { }).then(() => c.say(...a));
+  await c.W(st.ops.length ? 1.2 : 0.2);
+  for (const op of st.ops) { if (OPS[op.op]) await OPS[op.op](cc, op, st, i, plan); }
+  await reading;
   c.ch.rest(); c.ch.look(V(0, 0.5, 2));
 }
 

@@ -358,7 +358,7 @@ function say(raw, note = '', who = null) {
     const done = () => { if (finished) return; finished = true; sp.speaking = false; if (g !== GEN) rej(ABORT); else setTimeout(res, 250); };
     speakDone = done;
     const est = 900 + text.length * 62;
-    if (!audio.muted && A && A.speak) { try { A.speak(text, voice.pitch, voice.rate, String(id)); setTimeout(done, est * 2.2 + 3000); return; } catch (e) { } }
+    if (!audio.muted && A && A.speak) { try { A.speak(text, voice.pitch, voice.rate, String(id)); setTimeout(done, est * 1.35 + 1500); return; } catch (e) { } }
     if (!audio.muted && window.speechSynthesis && !AUTO) {
       try {
         const u = new SpeechSynthesisUtterance(text); u.lang = 'tr-TR'; u.pitch = voice.pitch; u.rate = voice.rate;
@@ -675,6 +675,7 @@ window.LAB = {
   back() { if (alarmOn) { stopAlarm(); return true; } goHome(); return true; },
   pause() { stopSpeech(); ['sizzle', 'boil', 'steam'].forEach(l => setLoop(l, 0)); },
   state: () => ({ step: cur, view, timers: timers.map(t => [t.label, Math.round((t.end - now()) / 1000), t.fired]) }),
+  plan: () => R.plan, camPos: () => camera.position.toArray().map(v => +v.toFixed(2)),
   go, next, shot: setShot, ch, V, TABLE: () => TABLE, ghostFly, ghostFinale, gstate: () => ghost ? [ghostBusy, ghost.visible, +ghost.material.opacity.toFixed(2), ghost.position.clone().project(camera).toArray().map(v => +v.toFixed(2)), ghost.material.map.image ? ghost.material.map.image.width : 'noimg', ghost.scale.toArray()] : 'none', cam: (p, t, h) => { SHOT.dbg = { p, t, h }; setShot('dbg'); },
 };
 
