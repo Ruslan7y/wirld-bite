@@ -27,7 +27,8 @@ async function chop(c, whole, type, dur, line) {
   const KN = [[-0.05, 0.016, 0], [0, th - Math.PI / 2, 0]];
   if (!c.isHeld(K.knife)) await c.grab(K.knife, 'R', ...KN); else K.knife.rotation.set(...KN[1]);
   if (ch.handPose) {
-    ch.handPose('R', FW.clone().add(V(0, -0.35, 0)), AX.clone());            // palm faces the middle, knuckles up
+    const fK = FW.clone().add(V(0, -0.35, 0)).normalize();
+    ch.handPose('R', fK, V().crossVectors(AX, fK).normalize().addScaledVector(AX, 0.35)); // knuckles up, palm down over the handle
     ch.handPose('L', FW.clone().multiplyScalar(0.75).add(V(0, -0.65, 0)).addScaledVector(AX, -0.25), FW.clone().multiplyScalar(-0.65).add(V(0, -0.75, 0))); // claw on top of the vegetable
   }
   const ps = P[type].board, n = ps.max;
@@ -110,7 +111,8 @@ function startStir(c, amp = 1) {
   if (ch.handPose) {
     const th = ch.root.rotation.y, Y = V(0, 1, 0);
     const AX = V(1, 0, 0).applyAxisAngle(Y, th), FW = V(0, 0, 1).applyAxisAngle(Y, th);
-    ch.handPose('R', FW.clone().multiplyScalar(0.4).add(V(0, -1, 0)), AX.clone());
+    const fS = FW.clone().multiplyScalar(0.9).add(V(0, -0.6, 0)).normalize();
+    ch.handPose('R', fS, V().crossVectors(AX, fS).normalize().addScaledVector(AX, 0.3));
     ch.handPose('L', FW.clone().add(AX.clone().multiplyScalar(0.6)).add(V(0, -0.3, 0)), V(0, -1, 0));
   }
   let a = 0;
@@ -221,7 +223,7 @@ const etsote = {
         await fly(c, P.meat.bowl, P.meat.pan, P.meat.bowl.count, 0.55, 0.8);
         await c.T(0.4, k => K.meatBowl.rotation.z = -(1 - k) * 1.5);
         c.drop(K.meatBowl); ch.rest();
-        const t = c.startTimer(10, 'Etler sotelenıyor');
+        const t = c.startTimer(10, 'Etler soteleniyor');
         c.say('Duyuyor musun bu cızırtıyı? Etler önce suyunu salacak, sonra o suyu çekip kızaracak.', '⏱ 10 dk · ara ara karıştır').catch(() => { });
         const st = startStir(c, 0.7);
         await c.waitTimer(t, k => {
@@ -427,6 +429,7 @@ const etsote = {
         } else { c.shot('front', 1.2); ch.look(V(0, 0.5, 2)); }
         ch.cheer(); c.sfx.success(); c.vib(40);
         await c.say('İşte et sotemiz hazır! Ellerine sağlık, afiyet olsun {hey}!', 'Yanına pilav ya da közlenmiş biber çok yakışır.');
+        if (c.GHOST) await c.ghostFinale();
       },
     },
   ],

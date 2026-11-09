@@ -16,7 +16,8 @@ import { makeCarla } from '../real/carla.js';
 const $ = id => document.getElementById(id);
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const QS = new URLSearchParams(location.search);
-const AUTO = QS.has('auto');                 // test: advance automatically
+const AUTO = QS.has('auto');
+const GHOST = QS.has('ghost');               // ghost edition                 // test: advance automatically
 const FF = +(QS.get('ff') || 1);
 const SPD = +(QS.get('spd') || 1);          // test: animation speed             // test: timer speed multiplier
 const A = window.Android || null;
@@ -347,27 +348,57 @@ function startTimer(stepIdx, min, label) {
   if (t) return t;
   t = { id: (Date.now() % 1e8) + stepIdx, step: stepIdx, r: R.id, label, total: min * 60e3, end: now() + min * 60e3, fired: false };
   timers.push(t); saveTimers();
-  if (A && A.scheduleAlarm) try { A.scheduleAlarm(t.id, t.end, '⏰ ' + R.title + ': süre doldu', label + ' hazır! Sonraki adıma geçebilirsin.'); } catch (e) { }
+  schedule(t);
   drawTimers();
   return t;
 }
-const timerFrac = t => t ? clamp(1 - (t.end - now()) / t.total) : 1;
-function fastTimer(id) { const t = timers.find(t => t.id === id); if (!t) return; const left = t.end - now(); t.end = now() + Math.min(left, 8000); saveTimers(); if (A && A.scheduleAlarm) try { A.cancelAlarm(t.id); A.scheduleAlarm(t.id, t.end, '⏰ ' + R.title, t.label + ' hazır!'); } catch (e) { } sfx.whoosh(); }
-function fmt(ms) { ms = Math.max(0, ms); const s = Math.ceil(ms / 1000), m = Math.floor(s / 60); return `${m}:${String(s % 60).padStart(2, '0')}`; }
-function drawTimers() {
-  $('timers').innerHTML = timers.filter(t => !t.dismissed).map(t => `<div class="tchip ${t.fired ? 'done' : ''}" data-id="${t.id}"><div class="ring" style="--p:${timerFrac(t).toFixed(3)}"></div><span>${t.label}</span><b>${t.fired ? '⏰' : fmt(t.end - now())}</b>${t.fired ? '<button data-x="1">✕</button>' : '<button data-ff="1">⏩</button>'}</div>`).join('');
+const timerFrac = t => t ? clamp(1 - timeLeft(t) / t.total) : 1;
+const timeLeft = t => t.paused != null ? t.paused : t.end - now();
+let alarmsOff = false; try { alarmsOff = localStorage.getItem('lab_alarmsOff') === '1'; } catch (e) { }
+function schedule(t) {
+  if (!A || !A.scheduleAlarm) return;
+  try { A.cancelAlarm(t.id); } catch (e) { }
+  if (alarmsOff || t.paused != null || t.fired || t.dismissed) return;
+  try { A.scheduleAlarm(t.id, t.end, '⏰ ' + R.title + ': süre doldu', t.label + ' hazır! Sonraki adıma geçebilirsin.'); } catch (e) { }
 }
-$('timers').onclick = e => {
-  const c = e.target.closest('.tchip'); if (!c) return; const id = +c.dataset.id;
-  if (e.target.dataset.ff) fastTimer(id);
-  if (e.target.dataset.x) { const t = timers.find(t => t.id === id); if (t) t.dismissed = true; saveTimers(); stopAlarm(); }
-};
+function timerAction(id, act) {
+  const t = timers.find(t => t.id === id); if (!t) return;
+  if (act === 'pause') { if (t.paused == null) t.paused = Math.max(0, t.end - now()); else { t.end = now() + t.paused; t.paused = null; } }
+  if (act === 'ff') { if (t.paused != null) t.paused = Math.max(0, t.paused - 60e3); else t.end -= 60e3; }
+  if (act === 'end') { t.paused = null; t.end = now(); }
+  if (act === 'cancel') { t.dismissed = true; t.fired = true; if (alarmOn === t) stopAlarm(); }
+  if (act === 'stop') { stopAlarm(); t.dismissed = true; }
+  saveTimers(); schedule(t); drawTimers(true); sfx.tap();
+}
+function fmt(ms) { ms = Math.max(0, ms); const s = Math.ceil(ms / 1000), m = Math.floor(s / 60); return `${m}:${String(s % 60).padStart(2, '0')}`; }
+// chips are created once and only their text/ring is updated (no flicker, buttons stay clickable)
+function drawTimers(rebuild) {
+  const box = $('timers');
+  const list = timers.filter(t => !t.dismissed);
+  const key = list.map(t => t.id + (t.fired ? 'f' : '') + (t.paused != null ? 'p' : '')).join(',');
+  if (rebuild || box.dataset.key !== key) {
+    box.dataset.key = key;
+    box.innerHTML = list.map(t => t.fired
+      ? `<div class="tchip done" data-id="${t.id}"><span>⏰ ${t.label}</span><button data-a="stop" class="big">Durdur</button></div>`
+      : `<div class="tchip" data-id="${t.id}"><div class="ring"></div><span>${t.label}</span><b></b>
+          <button data-a="pause" title="Duraklat">${t.paused != null ? '▶' : '⏸'}</button><button data-a="ff" title="1 dk ileri">+1dk</button><button data-a="end" title="Hemen bitir">⏭</button><button data-a="cancel" title="İptal">✕</button></div>`).join('');
+  }
+  for (const el of box.children) {
+    const t = timers.find(x => x.id === +el.dataset.id); if (!t || t.fired) continue;
+    el.querySelector('b').textContent = fmt(timeLeft(t)) + (t.paused != null ? ' ⏸' : '');
+    el.querySelector('.ring').style.setProperty('--p', timerFrac(t).toFixed(3));
+  }
+}
+$('timers').addEventListener('click', e => {
+  const b = e.target.closest('button'); const c = e.target.closest('.tchip'); if (!b || !c) return;
+  e.stopPropagation(); timerAction(+c.dataset.id, b.dataset.a);
+});
 let alarmOn = null, vibT = null;
 function fireTimer(t, silent) {
   t.fired = true; saveTimers();
   if (A && A.cancelAlarm) try { A.cancelAlarm(t.id); } catch (e) { }
-  drawTimers();
-  if (silent) return;
+  drawTimers(true);
+  if (silent || alarmsOff) { if (alarmsOff && !silent) toast('⏱ ' + t.label + ' hazır'); return; }
   alarmOn = t; setLoop('alarm', 1);
   $('alarmTxt').textContent = t.label + ' hazır. Sonraki adıma geçebilirsin.';
   $('alarm').classList.remove('hide');
@@ -375,27 +406,35 @@ function fireTimer(t, silent) {
   if (AUTO) setTimeout(stopAlarm, 1500);
 }
 function stopAlarm() {
+  setLoop('alarm', 0); clearInterval(vibT); $('alarm').classList.add('hide');
   if (!alarmOn) return;
-  alarmOn.dismissed = true; saveTimers(); alarmOn = null;
-  setLoop('alarm', 0); clearInterval(vibT); $('alarm').classList.add('hide'); drawTimers();
+  alarmOn.dismissed = true; saveTimers(); alarmOn = null; drawTimers(true);
   if (stepState.waitingTimer) { say('Süre doldu! Hazırsan sonraki adıma geçelim.').catch(() => { }); }
 }
+function setAlarmsOff(v) {
+  alarmsOff = v; try { localStorage.setItem('lab_alarmsOff', v ? '1' : '0'); } catch (e) { }
+  $('bBell').textContent = v ? '🔕' : '🔔'; timers.forEach(schedule);
+  if (v) stopAlarm(); toast(v ? '🔕 Alarmlar kapalı (sayaçlar çalışır)' : '🔔 Alarmlar açık');
+}
 $('bAlarmStop').onclick = stopAlarm;
+$('bAlarmOff').onclick = () => { setAlarmsOff(true); };
+$('bBell').onclick = () => setAlarmsOff(!alarmsOff);
+$('bBell').textContent = alarmsOff ? '🔕' : '🔔';
 let lastTimerDraw = 0;
 function tickTimers(dt) {
   simNow += dt * 1000 * FF - dt * 1000; // extra sim time in test mode
   simNow = Math.max(simNow, Date.now());
-  for (const t of timers) if (!t.fired && now() >= t.end) fireTimer(t, document.hidden);
+  for (const t of timers) if (!t.fired && t.paused == null && now() >= t.end) fireTimer(t, document.hidden);
   if (performance.now() - lastTimerDraw > 250) { lastTimerDraw = performance.now(); drawTimers(); }
 }
-document.addEventListener('visibilitychange', () => { if (!document.hidden) { simNow = Date.now(); for (const t of timers) if (!t.fired && now() >= t.end) fireTimer(t, true); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { simNow = Date.now(); for (const t of timers) if (!t.fired && t.paused == null && now() >= t.end) fireTimer(t, true); } });
 window.LAB_ALARM_FIRED = () => { };
 
 // ---------------- UI ----------------
 let toastT;
 function toast(s) { const t = $('toast'); t.textContent = s; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 1600); }
 $('bSound').onclick = () => { setMuted(!audio.muted); $('bSound').textContent = audio.muted ? '🔇' : '🔊'; if (audio.muted) stopSpeech(); };
-$('bExit').onclick = () => { stopSpeech(); location.href = 'index.html'; };
+$('bExit').onclick = () => { stopSpeech(); location.href = 'index.html' + (GHOST ? '?ghost=1' : ''); };
 $('bNext').onclick = () => next();
 $('bPrev').onclick = () => prev();
 $('bRep').onclick = () => repeat();
@@ -413,7 +452,7 @@ let cur = -1;
 const stepState = { waitingTimer: false };
 function ctx(i) {
   return {
-    i, say, W, T, H, shot, guest, scene, fork: () => FORK || (FORK = (() => { const f = M.makeFork(); scene.add(f); return f; })()), moveTo, both, hold, drop, grab, isHeld, release: o => { const f = FOLLOW.get(o); if (f && ch.setGrip) ch.setGrip(f.side, 0.25); FOLLOW.delete(o); }, TABLE, reachTo, wp, ch, K, P, pan, lid, plate, spoon, oil, paste, salt, black, water, onion, pepper, tomato, garlic, parsley,
+    i, say, W, T, H, shot, guest, scene, GHOST, ghostFinale, fork: () => FORK || (FORK = (() => { const f = M.makeFork(); scene.add(f); return f; })()), moveTo, both, hold, drop, grab, isHeld, release: o => { const f = FOLLOW.get(o); if (f && ch.setGrip) ch.setGrip(f.side, 0.25); FOLLOW.delete(o); }, TABLE, reachTo, wp, ch, K, P, pan, lid, plate, spoon, oil, paste, salt, black, water, onion, pepper, tomato, garlic, parsley,
     ST, sfx, setLoop, vib, REAL, station, boardHome: () => HOME.get(K.board), startTimer: (min, label) => startTimer(i, min, label), timerFrac, stepState, oilStream, waterStream,
     saltP, pepP, steamP, spitP, setPanLevel: v => panLevel = v, F, M, V, rand, ease, lerp, clamp, chefId,
     waitTimer: async (t, onP, lines = []) => {
@@ -442,7 +481,7 @@ async function go(i, replay = false) {
 }
 function next() {
   sfx.tap();
-  if (cur >= R.steps.length - 1) { if (AUTO) return; stopSpeech(); location.href = 'index.html'; return; }
+  if (cur >= R.steps.length - 1) { if (AUTO) return; stopSpeech(); location.href = 'index.html' + (GHOST ? '?ghost=1' : ''); return; }
   go(cur + 1);
 }
 function prev() { sfx.tap(); if (cur > 0) go(cur - 1); }
@@ -487,6 +526,61 @@ function cookFrame(dt, time) {
   const lm = pan.userData.liquid.material; if (lm.bumpMap) { lm.bumpMap.rotation = time * 0.2 * (ST.boil + ST.stir); lm.bumpMap.offset.y = time * 0.05 * ST.boil; }
 }
 
+// ---------------- ghost (separate edition) ----------------
+let ghost = null, ghostBusy = false, ghostNext = 18;
+if (GHOST) {
+  const tex = new THREE.TextureLoader().load('models/ghost.png'); tex.colorSpace = THREE.SRGBColorSpace;
+  ghost = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, depthTest: false }));
+  ghost.renderOrder = 50; ghost.visible = false; scene.add(ghost);
+  const bub = document.createElement('div'); bub.id = 'ghostBub';
+  bub.style.cssText = 'position:fixed;z-index:20;pointer-events:none;background:#fff;color:#222;font:800 17px system-ui;padding:8px 14px;border-radius:18px;box-shadow:0 6px 24px rgba(120,160,255,.6);opacity:0;transition:opacity .25s;transform:translate(-50%,-100%);white-space:nowrap';
+  document.body.appendChild(bub);
+}
+const _gv = new THREE.Vector3();
+function ghostAt(x, y, d, s, op, wob = 0) {
+  // position in front of the active camera (camera space → world)
+  _gv.set(x, y, -d).applyMatrix4(camera.matrixWorld); ghost.position.copy(_gv);
+  ghost.scale.set(s * 0.78, s, 1); ghost.material.opacity = op; ghost.material.rotation = wob; ghost.visible = op > 0.01;
+}
+function ghostBubble(text, on) {
+  const b = document.getElementById('ghostBub'); if (!b) return;
+  if (text) b.textContent = text; b.style.opacity = on ? 1 : 0;
+  if (on) { const p = ghost.position.clone().project(camera); b.style.left = ((p.x + 1) / 2 * innerWidth) + 'px'; b.style.top = ((1 - p.y) / 2 * innerHeight - innerHeight * 0.13) + 'px'; }
+}
+async function ghostFly() {
+  if (!ghost || ghostBusy) return; ghostBusy = true;
+  const dir = Math.random() < 0.5 ? 1 : -1, y0 = rand(-0.05, 0.12), d = rand(1.0, 1.4);
+  let laughed = false;
+  await tween(5.0, (k) => {
+    const hw = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * camera.aspect * d + 0.12;
+    const x = dir * (-1 + k * 2) * hw, y = y0 + Math.sin(k * Math.PI * 3) * 0.06;
+    const op = Math.min(1, k * 6, (1 - k) * 6) * 0.92;
+    ghostAt(x, y, d, 0.42 * d * 0.7, op, Math.sin(k * 12) * 0.12 * dir);
+    if (k > 0.3 && !laughed) { laughed = true; sfx.laugh(); vib(40); }
+    ghostBubble('Hahahahaha! 👻', k > 0.3 && k < 0.8);
+  }, ease.linear);
+  ghost.visible = false; ghostBubble('', false);
+  ghostBusy = false; ghostNext = rand(25, 50);
+}
+async function ghostFinale() {
+  if (!ghost) return;
+  while (ghostBusy) await new Promise(r => setTimeout(r, 200));
+  ghostBusy = true;
+  await tween(1.4, k => ghostAt(-1.0 + k * 1.0, 0.05 + Math.sin(k * 6) * 0.03, 1.05, 0.33, Math.min(1, k * 3) * 0.92), ease.out);
+  sfx.laugh();
+  const hold = setInterval(() => { ghostAt(Math.sin(performance.now() / 500) * 0.03, 0.05 + Math.sin(performance.now() / 300) * 0.02, 1.05, 0.33, 0.92); ghostBubble('Nuş olsun, kele! 😄', true); }, 16);
+  await new Promise(res => {
+    const text = 'Nuş olsun, kele!';
+    if (!audio.muted && A && A.speak) { window.LAB_TTS_DONE = ((prev) => id => { if (id === 'ghost') { window.LAB_TTS_DONE = prev; res(); } else prev(id); })(window.LAB_TTS_DONE); try { A.speak(text, 0.75, 1.0, 'ghost'); } catch (e) { res(); } setTimeout(res, 4000); }
+    else if (!audio.muted && window.speechSynthesis && !AUTO) { const u = new SpeechSynthesisUtterance(text); u.lang = 'tr-TR'; u.pitch = 0.7; u.onend = res; speechSynthesis.speak(u); setTimeout(res, 4000); }
+    else setTimeout(res, 2200);
+  });
+  await new Promise(r => setTimeout(r, 900));
+  clearInterval(hold); ghostBubble('', false);
+  await tween(1.2, k => ghostAt(k * 1.3, 0.05 + k * 0.3, 1.05 + k * 0.4, 0.33, (1 - k) * 0.92), ease.in);
+  ghost.visible = false; ghostBusy = false; ghostNext = 999;
+}
+
 // ---------------- render loop ----------------
 let last = performance.now(), time = 0;
 function frame() {
@@ -502,6 +596,7 @@ function frame() {
   allP.forEach(p => p.update(dt));
   tickTimers(dt);
   applyCamera(time);
+  if (ghost && !ghostBusy && cur >= 0 && !alarmOn && (ghostNext -= dt) <= 0) ghostFly();
   const w = innerWidth, h = innerHeight;
   renderer.setViewport(0, 0, w, h); renderer.setScissorTest(false); renderer.clear();
   renderer.render(scene, camera);
@@ -517,10 +612,10 @@ function resize() { renderer.setSize(innerWidth, innerHeight, false); allP.forEa
 addEventListener('resize', resize); resize();
 
 window.LAB = {
-  back() { if (alarmOn) { stopAlarm(); return true; } stopSpeech(); location.href = 'index.html'; return true; },
+  back() { if (alarmOn) { stopAlarm(); return true; } stopSpeech(); location.href = 'index.html' + (GHOST ? '?ghost=1' : ''); return true; },
   pause() { stopSpeech(); ['sizzle', 'boil', 'steam'].forEach(l => setLoop(l, 0)); },
   state: () => ({ step: cur, view, timers: timers.map(t => [t.label, Math.round((t.end - now()) / 1000), t.fired]) }),
-  go, next, shot: setShot, ch, V, TABLE: () => TABLE, cam: (p, t, h) => { SHOT.dbg = { p, t, h }; setShot('dbg'); },
+  go, next, shot: setShot, ch, V, TABLE: () => TABLE, ghostFly, ghostFinale, gstate: () => ghost ? [ghostBusy, ghost.visible, +ghost.material.opacity.toFixed(2), ghost.position.clone().project(camera).toArray().map(v => +v.toFixed(2)), ghost.material.map.image ? ghost.material.map.image.width : 'noimg', ghost.scale.toArray()] : 'none', cam: (p, t, h) => { SHOT.dbg = { p, t, h }; setShot('dbg'); },
 };
 
 // ---------------- start ----------------

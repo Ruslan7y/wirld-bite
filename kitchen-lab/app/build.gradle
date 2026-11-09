@@ -10,8 +10,8 @@ android {
         applicationId "com.worldbite.kitchenlab"
         minSdk 24
         targetSdk 34
-        versionCode 7
-        versionName "0.6.0"
+        versionCode 8
+        versionName "0.7.0"
     }
 
     signingConfigs {
@@ -25,6 +25,11 @@ android {
         }
     }
 
+    flavorDimensions "edition"
+    productFlavors {
+        normal { dimension "edition" }
+        ghost { dimension "edition"; applicationIdSuffix ".ghost"; versionNameSuffix "-ghost" }
+    }
     buildTypes {
         debug { signingConfig signingConfigs.demo }
         release {

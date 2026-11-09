@@ -94,6 +94,27 @@ export const sfx = {
   pour() { if (!ctx) return; noise(0.4, { type: 'lowpass', freq: 600, q: 3, gain: 0.25, attack: 0.05 }); },
   sizzleBurst() { if (!ctx) return; noise(1.2, { type: 'highpass', freq: 3000, q: 0.6, gain: 0.5, attack: 0.01 }); noise(0.8, { freq: 1200, q: 0.5, gain: 0.25 }); },
   lid() { if (!ctx) return; [1200, 2600, 3900].forEach((f, i) => tone(f, 0.35, { gain: 0.08 / (i + 1), rev: 0.4 })); noise(0.04, { type: 'highpass', freq: 2500, gain: 0.25 }); },
+  laugh() {
+    // ghostly "ha-ha-ha-ha": voiced bursts through vowel formants, falling pitch, lots of reverb
+    if (!ctx) return;
+    const t0 = now();
+    for (let i = 0; i < 7; i++) {
+      const t = t0 + i * 0.17, f0 = 230 - i * 12;
+      const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f0 * 0.82, t + 0.12);
+      const n = ctx.createBufferSource(); n.buffer = noiseBuf;
+      const ng = ctx.createGain(); ng.gain.value = 0.35;
+      const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.5, t + 0.02); g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+      const sum = ctx.createGain();
+      o.connect(sum); n.connect(ng).connect(sum);
+      for (const [f, q, gg] of [[800, 6, 1], [1250, 8, 0.6], [2600, 10, 0.25]]) {
+        const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q;
+        const fg = ctx.createGain(); fg.gain.value = gg; sum.connect(bp).connect(fg).connect(g);
+      }
+      g.connect(sfxBus); const r = ctx.createGain(); r.gain.value = 0.9; g.connect(r).connect(reverb);
+      o.start(t); o.stop(t + 0.16); n.start(t, Math.random()); n.stop(t + 0.16);
+    }
+    noise(1.4, { type: 'bandpass', freq: 500, q: 0.7, gain: 0.12, attack: 0.4, rev: 0.8 });
+  },
   tick() { if (!ctx) return; noise(0.015, { freq: 4000, q: 8, gain: 0.18, rev: 0 }); },
 };
 

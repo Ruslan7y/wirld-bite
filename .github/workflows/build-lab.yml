@@ -33,13 +33,17 @@ jobs:
       - name: Build APK
         run: gradle assembleRelease --no-daemon --stacktrace
 
-      - name: Rename APK
-        run: cp app/build/outputs/apk/release/app-release.apk ../KitchenLab.apk
+      - name: Rename APKs
+        run: |
+          cp app/build/outputs/apk/normal/release/app-normal-release.apk ../KitchenLab.apk
+          cp app/build/outputs/apk/ghost/release/app-ghost-release.apk ../KitchenLab-Hayalet.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: KitchenLab-apk
-          path: KitchenLab.apk
+          path: |
+            KitchenLab.apk
+            KitchenLab-Hayalet.apk
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
@@ -48,6 +52,8 @@ jobs:
           name: Kitchen Lab v0.${{ github.run_number }} (test)
           body: |
             🎂 **World Bite Kitchen Lab**: gerçekçi 3D pişirme animasyonu test uygulaması (World Bite'tan ayrı kurulur).
-          files: KitchenLab.apk
+          files: |
+            KitchenLab.apk
+            KitchenLab-Hayalet.apk
           make_latest: false
           prerelease: true

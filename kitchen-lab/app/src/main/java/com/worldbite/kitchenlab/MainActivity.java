@@ -73,7 +73,7 @@ public class MainActivity extends Activity {
             }
         });
         web.addJavascriptInterface(new Bridge(), "Android");
-        web.loadUrl("https://appassets.androidplatform.net/assets/www/index.html");
+        web.loadUrl("https://appassets.androidplatform.net/assets/www/index.html" + getString(R.string.start_query));
 
         tts = new TextToSpeech(this, status -> {
             if (status != TextToSpeech.SUCCESS) return;

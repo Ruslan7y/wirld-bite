@@ -20,11 +20,14 @@ html,body{height:100%;overflow:hidden;background:#140f0c;color:#fff8f0;font-fami
 .prog{height:3px;border-radius:2px;background:rgba(255,255,255,.15);margin-top:5px;overflow:hidden}
 .prog i{display:block;height:100%;width:0;background:var(--acc);transition:width .6s}
 #timers{position:fixed;z-index:10;top:calc(env(safe-area-inset-top) + 62px);left:10px;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
-.tchip{display:flex;align-items:center;gap:8px;background:rgba(22,16,12,.75);border:1px solid rgba(255,255,255,.12);border-radius:99px;padding:5px 6px 5px 12px;font-size:13px;backdrop-filter:blur(10px);animation:pop .35s}
+.tchip{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;max-width:calc(100vw - 20px);background:rgba(22,16,12,.75);border:1px solid rgba(255,255,255,.12);border-radius:99px;padding:5px 6px 5px 12px;font-size:13px;backdrop-filter:blur(10px);animation:pop .35s}
 .tchip b{font-variant-numeric:tabular-nums;font-size:15px;min-width:52px}
 .tchip .ring{width:20px;height:20px;border-radius:50%;background:conic-gradient(var(--acc) calc(var(--p)*1turn),rgba(255,255,255,.15) 0)}
 .tchip button{border:0;background:rgba(255,255,255,.14);color:#fff;border-radius:99px;padding:4px 9px;font-size:12px}
-.tchip.done{background:rgba(200,50,40,.85);animation:shake .5s infinite}
+.tchip.done{background:rgba(200,50,40,.92);border-color:#ff8a70}
+.tchip button.big{background:#fff;color:#b8321f;font-weight:800;padding:6px 14px;font-size:13px}
+.tchip button{min-width:30px}
+.ghostbtn{display:block;width:100%;border:1px solid rgba(255,255,255,.25);background:transparent;color:#fff;border-radius:14px;padding:12px;font-size:14px;margin-top:10px}
 @keyframes shake{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
 @keyframes pop{from{opacity:0;transform:scale(.85)}}
 .mic-hint{position:fixed;z-index:10;top:calc(env(safe-area-inset-top) + 58px);right:10px;background:var(--acc);font-size:12px;padding:6px 12px;border-radius:99px;font-weight:600}

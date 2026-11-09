@@ -43,7 +43,8 @@ drawChefs();
 document.getElementById('chefs').onclick=e=>{const c=e.target.closest('.chef');if(!c)return;chef=c.dataset.id;try{localStorage.setItem('lab_chef',chef)}catch(e){}drawChefs()};
 const R=[['chef.html?r=etsote&chef=carla','👩🏽‍🍳','Carla ile et sote (gerçekçi)','Gerçek mutfak · gerçekçi şef · 11 adım · kamera akışa göre değişir',true],['chef.html?r=etsote','🥩','Et sote','Şefle birlikte · 11 adım · ~1 saat · gerçek zamanlayıcı ve alarm',true],['cake.html','🎂','Çilekli vanilyalı kek','Sinematik prototip · 14 adım · film gibi izle ya da kendin yap']];
 document.getElementById('recipes').innerHTML=R.map(([u,e,n,d,nw])=>`<div class="card ${nw?'new':''}" data-u="${u}"><div class="e">${e}</div><div><b>${n}${nw?'<span class="tag">YENİ</span>':''}</b><small>${d}</small></div></div>`).join('');
-document.getElementById('recipes').onclick=e=>{const c=e.target.closest('.card');if(c)location.href=c.dataset.u.includes('chef=')?c.dataset.u:c.dataset.u+(c.dataset.u.includes('?')?'&':'?')+'chef='+chef};
+const GH=location.search.includes('ghost')?'&ghost=1':'';if(GH)document.querySelector('h1').textContent='Mutfağa hoş geldin 👻';
+document.getElementById('recipes').onclick=e=>{const c=e.target.closest('.card');if(c)location.href=(c.dataset.u.includes('chef=')?c.dataset.u:c.dataset.u+(c.dataset.u.includes('?')?'&':'?')+'chef='+chef)+(c.dataset.u.includes('?')||!c.dataset.u.includes('cake')?GH:'')};
 window.LAB={back:()=>false};
 </script>
 </body>
