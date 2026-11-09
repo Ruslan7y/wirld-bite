@@ -363,10 +363,10 @@ const etsote = {
         ch.rest(); await turn(c, 0);
         // board aside, plate in its place
         await c.say('Tabağımızı hazırlayalım.');
-        await c.moveTo(K.board, c.REAL ? V(-0.62, 0, -0.62) : V(-0.55, 0, 0.12), 0.6);
-        if (c.REAL) plate.position.copy(c.boardHome().p); else plate.position.set(-0.04, 0, -0.08); plate.visible = true; plate.scale.setScalar(0.01);
+        if (c.REAL) { K.meatBowl.visible = false; plate.position.set(-0.14, 0, -0.16); }
+        else { await c.moveTo(K.board, V(-0.55, 0, 0.12), 0.6); plate.position.set(-0.04, 0, -0.08); } plate.visible = true; plate.scale.setScalar(0.01);
         await c.T(0.4, k => plate.scale.setScalar(Math.max(0.01, k)), c.ease.outBack);
-        c.shot('plate', 0.9);
+        c.shot(c.REAL ? 'serve' : 'plate', 0.9);
         c.hold(c.spoon, 'R', ...SPOON);
         for (let s = 0; s < 3; s++) {
           await turn(c, 0.35, 0.4);
@@ -385,7 +385,24 @@ const etsote = {
         await fly(c, P.parsley.board, P.parsley.plate, P.parsley.max, 0.7, 0.9);
         c.sfx.sparkle();
         ch.rest();
-        c.shot('front', 1.2); ch.look(V(0, 0.5, 2));
+        if (c.REAL && c.TABLE) {
+          // carry the plate to the dining table and serve there
+          await c.say('Haydi, yemeğimizi masaya götürelim.');
+          c.hold(plate, 'R', [-0.12, 0.012, 0], [0, 0, 0]);
+          const hl = c.H(() => ch.reach('L', plate.localToWorld(V(0.13, 0.015, 0)), 14));
+          ch.reach('R', plate.localToWorld(V(-0.12, 0.08, 0)), 6);
+          await c.W(0.6);
+          await c.moveTo(plate, plate.position.clone().add(V(0, 0.12, 0)), 0.5);
+          c.shot('table', 0.01);                       // camera cut: she is already at the table
+          await c.station('table', 0.01);
+          ch.reach('R', c.TABLE.spot.clone().add(V(0.12, 0.2, 0)), 30);
+          await c.W(0.6);
+          await c.reachTo('R', c.TABLE.spot.clone().add(V(0.1, 0.05, 0)), 0.8);
+          c.release(plate); hl();
+          await c.moveTo(plate, c.TABLE.spot.clone().add(V(0, 0.003, 0)), 0.4, c.ease.out);
+          c.sfx.thunk(); ch.rest();
+          ch.look(V(0, 0.5, 2));
+        } else { c.shot('front', 1.2); ch.look(V(0, 0.5, 2)); }
         ch.cheer(); c.sfx.success(); c.vib(40);
         await c.say('İşte et sotemiz hazır! Ellerine sağlık, afiyet olsun {hey}!', 'Yanına pilav ya da közlenmiş biber çok yakışır.');
       },

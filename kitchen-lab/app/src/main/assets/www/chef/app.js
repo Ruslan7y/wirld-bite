@@ -17,7 +17,8 @@ const $ = id => document.getElementById(id);
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const QS = new URLSearchParams(location.search);
 const AUTO = QS.has('auto');                 // test: advance automatically
-const FF = +(QS.get('ff') || 1);             // test: timer speed multiplier
+const FF = +(QS.get('ff') || 1);
+const SPD = +(QS.get('spd') || 1);          // test: animation speed             // test: timer speed multiplier
 const A = window.Android || null;
 const vib = ms => { try { A ? A.vibrate(ms) : navigator.vibrate && navigator.vibrate(ms); } catch (e) { } };
 
@@ -46,15 +47,27 @@ M.makeMaterials();
 const REAL = QS.get('chef') === 'carla';
 const K = buildKitchen(scene, { real: REAL });
 // realistic kitchen (user's model) placed so that its hob/counter match the recipe space
-let realGLTF = null, carlaGLTF = null, carlaTex = null, kitchenClip = null;
+let realGLTF = null, carlaGLTF = null, carlaTex = null, kitchenClip = null, TABLE = null;
 if (REAL) {
   const gl = new GLTFLoader(); gl.setMeshoptDecoder(MeshoptDecoder);
   const tl = new THREE.TextureLoader();
   const load = u => new Promise((res, rej) => gl.load(u, res, undefined, rej));
   const ltex = (u, srgb) => new Promise(res => tl.load(u, t => { t.flipY = false; if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; res(t); }));
-  const [kit, carla, dif, norm] = await Promise.all([load('models/kitchen.glb'), load('models/carla.glb'), ltex('models/carla_dif.jpg', true), ltex('models/carla_norm.jpg')]);
+  const [kit, carla, dif, norm, tab] = await Promise.all([load('models/kitchen.glb'), load('models/carla.glb'), ltex('models/carla_dif.jpg', true), ltex('models/carla_norm.jpg'), load('models/table.glb')]);
   const g = new THREE.Group(); g.rotation.y = -Math.PI / 2; g.position.set(1.69, -0.895, -1.28);
   kit.scene.scale.setScalar(0.1); g.add(kit.scene); scene.add(g);
+  // dining table (user's model) in the open part of the room, for serving
+  tab.scene.scale.setScalar(0.1); tab.scene.position.set(3.5, 0, 4.5); g.add(tab.scene);
+  tab.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  g.updateMatrixWorld(true);
+  const tb = new THREE.Box3().setFromObject(tab.scene), tc = tb.getCenter(new THREE.Vector3());
+  const rc = new THREE.Raycaster(); let spot = null;
+  for (const [dx, dz] of [[0, 0], [0.3, 0], [-0.3, 0], [0, 0.3], [0, -0.3], [0.6, 0], [-0.6, 0]]) {
+    rc.set(new THREE.Vector3(tc.x + dx, 2, tc.z + dz), new THREE.Vector3(0, -1, 0));
+    const h = rc.intersectObject(tab.scene, true)[0]; if (h && h.point.y > -0.3) { spot = h.point.clone(); break; }
+  }
+  TABLE = { spot: spot || new THREE.Vector3(tc.x, tb.max.y, tc.z) };
+  const pend = new THREE.PointLight(0xffe3b8, 1.6, 3, 1.4); pend.position.copy(TABLE.spot).add(new THREE.Vector3(0, 0.9, 0)); scene.add(pend);
   // face-on shots: cut away wall cabinets + hood between the camera and the chef
   kitchenClip = [new THREE.Plane(new THREE.Vector3(0, -1, 0), 0.52), new THREE.Plane(new THREE.Vector3(0, 0, -1), -0.25)];
   kit.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { m.clippingPlanes = kitchenClip; m.clipIntersection = true; }); } });
@@ -71,7 +84,7 @@ if (REAL) {
 // ---------------- chef ----------------
 const chefId = REAL ? 'carla' : ['leyla', 'zeynep', 'aylin'].includes(QS.get('chef')) ? QS.get('chef') : 'zeynep';
 const ch = REAL ? makeCarla(carlaGLTF, carlaTex, () => camera) : makeCharacter(chefId);
-const STATION = REAL ? { stove: { p: V(0.2, 0, -0.5), r: 0 }, board: { p: V(0.02, 0, -0.43), r: -Math.PI / 2 } } : { stove: { p: V(0, 0, -0.56), r: 0 }, board: { p: V(0, 0, -0.56), r: 0 } };
+const STATION = REAL ? { stove: { p: V(0.2, 0, -0.5), r: 0 }, board: { p: V(0.02, 0, -0.43), r: -Math.PI / 2 }, table: { p: TABLE.spot.clone().setY(0).add(V(0.42, 0, 0)), r: -Math.PI / 2 } } : { stove: { p: V(0, 0, -0.56), r: 0 }, board: { p: V(0, 0, -0.56), r: 0 } };
 ch.root.position.copy(STATION.stove.p);
 scene.add(ch.root);
 const CHEF = REAL ? { name: 'Carla', voice: { pitch: 1.05, rate: 0.97 } } : CHEF_INFO[chefId];
@@ -158,19 +171,21 @@ const SHOT = {
   plate: { p: [0.0, 0.55, 0.62], t: [-0.02, 0.03, 0.08], h: 40 },
 };
 if (REAL) Object.assign(SHOT, {
-  front: { p: [0.62, 0.62, 0.3], t: [0.24, 0.42, -0.5], h: 68 },
+  front: { p: [0.64, 0.66, 0.3], t: [0.22, 0.38, -0.5], h: 70 },
   face: { p: [0.4, 0.7, 0.15], t: [0.2, 0.62, -0.5], h: 40 },
   board: { p: [-0.85, 0.8, -0.38], t: [-0.2, 0.2, -0.44], h: 62 },
   pan: { p: [0.33, 0.52, 0.22], t: [0.33, 0.035, -0.12], h: 54 },
-  stove: { p: [0.62, 0.42, 0.26], t: [0.22, 0.12, -0.3], h: 64 },
+  stove: { p: [0.7, 0.56, 0.3], t: [0.24, 0.16, -0.26], h: 62 },
   plate: { p: [-0.75, 0.62, -0.4], t: [-0.3, 0.03, -0.45], h: 52 },
   wide: { p: [-1.45, 0.76, -2.2], t: [0.35, 0.1, -0.3], h: 52 },
+  serve: { p: [0.2, 0.78, 0.3], t: [0.08, 0.02, -0.16], h: 62 },
+  table: TABLE ? { p: TABLE.spot.toArray().map((v, i) => v + [-0.95, 0.62, 0.55][i]), t: TABLE.spot.toArray().map((v, i) => v + [0.2, 0.28, -0.05][i]), h: 58 } : { p: [0, 0.5, 1], t: [0, 0, 0], h: 50 },
 });
-let view = 'front';
+let view = 'front', shotAge = 0;
 function shot(name, dur = 1.2) {
-  const s = SHOT[name]; view = name;
+  const s = SHOT[name]; view = name; shotAge = 0;
   const p0 = cam.p.clone(), t0 = cam.t.clone(), h0 = cam.h, p1 = V(...s.p), t1 = V(...s.t);
-  $('pip').classList.toggle('hide', !['board', 'pan', 'stove', 'plate', 'wide'].includes(name));
+  $('pip').classList.toggle('hide', !['board', 'pan', 'stove', 'plate', 'wide', 'serve'].includes(name));
   return T(dur, k => { cam.p.lerpVectors(p0, p1, k); cam.t.lerpVectors(t0, t1, k); cam.h = lerp(h0, s.h, k); });
 }
 function setShot(name) { const s = SHOT[name]; view = name; cam.p.set(...s.p); cam.t.set(...s.t); cam.h = s.h; }
@@ -181,7 +196,8 @@ function applyCamera(time) {
     // fixed real room: no dolly (walls!), cam.h is the vertical field of view
     camera.fov = cam.h * (aspect > 1 ? 0.7 : 1); camera.aspect = aspect; camera.updateProjectionMatrix();
     const a = 0.002, sx = Math.sin(time * 0.7) * a, sy = Math.sin(time * 0.53 + 1) * a * 0.7;
-    camera.position.set(cam.p.x + sx, cam.p.y + sy, cam.p.z); look.set(cam.t.x, cam.t.y, cam.t.z); camera.lookAt(look);
+    shotAge += 1 / 60; const push = Math.min(0.07, shotAge * 0.006);
+    camera.position.set(cam.p.x + (cam.t.x - cam.p.x) * push + sx, cam.p.y + (cam.t.y - cam.p.y) * push + sy, cam.p.z + (cam.t.z - cam.p.z) * push); look.set(cam.t.x, cam.t.y, cam.t.z); camera.lookAt(look);
     renderer.localClippingEnabled = view !== 'wide';
     ch.head.getWorldPosition(look);
     const f = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), ch.root.rotation.y);
@@ -368,7 +384,7 @@ let cur = -1;
 const stepState = { waitingTimer: false };
 function ctx(i) {
   return {
-    i, say, W, T, H, shot, moveTo, both, hold, drop, grab, isHeld, reachTo, wp, ch, K, P, pan, lid, plate, spoon, oil, paste, salt, black, water, onion, pepper, tomato, garlic, parsley,
+    i, say, W, T, H, shot, moveTo, both, hold, drop, grab, isHeld, release: o => { const f = FOLLOW.get(o); if (f && ch.setGrip) ch.setGrip(f.side, 0.25); FOLLOW.delete(o); }, TABLE, reachTo, wp, ch, K, P, pan, lid, plate, spoon, oil, paste, salt, black, water, onion, pepper, tomato, garlic, parsley,
     ST, sfx, setLoop, vib, REAL, station, boardHome: () => HOME.get(K.board), startTimer: (min, label) => startTimer(i, min, label), timerFrac, stepState, oilStream, waterStream,
     saltP, pepP, steamP, spitP, setPanLevel: v => panLevel = v, F, M, V, rand, ease, lerp, clamp, chefId,
     waitTimer: async (t, onP, lines = []) => {
@@ -397,7 +413,7 @@ async function go(i, replay = false) {
 }
 function next() {
   sfx.tap();
-  if (cur >= R.steps.length - 1) { stopSpeech(); location.href = 'index.html'; return; }
+  if (cur >= R.steps.length - 1) { if (AUTO) return; stopSpeech(); location.href = 'index.html'; return; }
   go(cur + 1);
 }
 function prev() { sfx.tap(); if (cur > 0) go(cur - 1); }
@@ -447,7 +463,7 @@ let last = performance.now(), time = 0;
 function frame() {
   requestAnimationFrame(frame);
   const tnow = performance.now(); const dt = Math.min(0.05, (tnow - last) / 1000); last = tnow; time += dt;
-  updateTweens(dt);
+  updateTweens(dt * SPD);
   hooks.forEach(h => h(dt, time));
   cookFrame(dt, time);
   ch.update(dt, time);
@@ -474,7 +490,7 @@ window.LAB = {
   back() { if (alarmOn) { stopAlarm(); return true; } stopSpeech(); location.href = 'index.html'; return true; },
   pause() { stopSpeech(); ['sizzle', 'boil', 'steam'].forEach(l => setLoop(l, 0)); },
   state: () => ({ step: cur, view, timers: timers.map(t => [t.label, Math.round((t.end - now()) / 1000), t.fired]) }),
-  go, next, shot: setShot, ch, V,
+  go, next, shot: setShot, ch, V, cam: (p, t, h) => { SHOT.dbg = { p, t, h }; setShot('dbg'); },
 };
 
 // ---------------- start ----------------

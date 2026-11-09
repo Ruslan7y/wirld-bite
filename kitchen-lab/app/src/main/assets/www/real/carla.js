@@ -127,7 +127,10 @@ export function makeCarla(gltf, tex, getCamera) {
       // fingers curl toward the palm
       const g = a.gripK, cs = ch.curlSign * (s === 'l' ? 1 : -1);
       for (const f of FINGERS) for (const j of [1, 2, 3]) { const b = B[`${f}_0${j}_${s}`]; if (b) b.rotateZ(cs * (0.12 + g * (j === 1 ? 0.95 : 1.15))); }
-      const th = B['thumb_02_' + s]; if (th) th.rotateZ(cs * g * 0.45);
+      for (const [j, w] of [[1, 0.45], [2, 0.6], [3, 0.6]]) {
+        const tb = B[`thumb_0${j}_${s}`]; if (!tb) continue;
+        tb.rotateZ((0.1 + g) * w); // same sign on both hands: thumb wraps into the palm
+      }
       body.updateMatrixWorld(true);
       const hp = B['hand_' + s].getWorldPosition(V()), mp = B['middle_01_' + s].getWorldPosition(V());
       a.grip.position.copy(hp).lerp(mp, 0.85).add(V(0, -0.012, 0));
@@ -162,7 +165,7 @@ export function makeCarla(gltf, tex, getCamera) {
     if (ch.blink < 0) ch.blink = 2 + Math.random() * 3;
     for (const s of ['l', 'r']) { const e = B['eyelid_' + s]; if (e) e.rotateX(k * 0.45 * ch.lidSign); }
   };
-  ch.jawSign = 1; ch.lidSign = 1; ch.leanSign = 1; ch.palmSign = -1; ch.curlSign = 1;
+  ch.jawSign = 1; ch.lidSign = 1; ch.leanSign = 1; ch.palmSign = -1; ch.curlSign = 1; ch.thumbVar = 0;
 
   ch.wave = async () => {
     ch.mood = 'happy';
