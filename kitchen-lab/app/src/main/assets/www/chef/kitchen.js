@@ -29,8 +29,9 @@ function skyTex() {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 
-export function buildKitchen(scene) {
-  const K = {};
+export function buildKitchen(scene, opt = {}) {
+  const K = {}; const REAL = !!opt.real;
+  const realScene = scene; if (REAL) scene = new THREE.Group(); // decor goes to a detached group
   const brass = new THREE.MeshStandardMaterial({ color: 0xc8a05a, metalness: 1, roughness: 0.3 });
   const copper = new THREE.MeshStandardMaterial({ color: 0xc8744a, metalness: 1, roughness: 0.28 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x1d1c1b, metalness: 0.5, roughness: 0.35 });
@@ -49,14 +50,16 @@ export function buildKitchen(scene) {
   }
 
   // ---- cooktop with a gas burner ----
-  const cook = new THREE.Group(); cook.position.set(0.33, 0, -0.08); scene.add(cook);
+  const cook = new THREE.Group(); cook.position.set(0.33, 0, -0.08); realScene.add(cook);
   const plateTop = mesh(new RoundedBoxGeometry(0.62, 0.01, 0.46, 2, 0.004), new THREE.MeshPhysicalMaterial({ color: 0x111111, roughness: 0.08, clearcoat: 1, metalness: 0.2 }), { cast: false });
-  plateTop.position.y = 0.004; cook.add(plateTop);
+  plateTop.position.y = 0.004; cook.add(plateTop); plateTop.visible = !REAL;
   const burner = new THREE.Group(); cook.add(burner);
+  const burnerParts = [];
   const cap = mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.016, 32), dark); cap.position.y = 0.017; burner.add(cap);
-  const ring = mesh(new THREE.CylinderGeometry(0.075, 0.08, 0.012, 40), new THREE.MeshStandardMaterial({ color: 0x8a8a8a, metalness: 1, roughness: 0.4 })); ring.position.y = 0.012; burner.add(ring);
+  const ring = mesh(new THREE.CylinderGeometry(0.075, 0.08, 0.012, 40), new THREE.MeshStandardMaterial({ color: 0x8a8a8a, metalness: 1, roughness: 0.4 })); ring.position.y = 0.012; burner.add(ring); burnerParts.push(cap, ring);
   // cast iron grate
-  const grate = new THREE.Group(); burner.add(grate);
+  const grate = new THREE.Group(); burner.add(grate); burnerParts.push(grate);
+  if (REAL) burnerParts.forEach(p => p.visible = false);
   const gr = mesh(new THREE.TorusGeometry(0.15, 0.006, 8, 48), dark); gr.rotation.x = Math.PI / 2; gr.position.y = 0.035; grate.add(gr);
   for (let i = 0; i < 6; i++) {
     const a = i * Math.PI / 3, b = mesh(new THREE.BoxGeometry(0.012, 0.012, 0.11), dark);
@@ -80,7 +83,8 @@ export function buildKitchen(scene) {
     const k = new THREE.Group(); k.position.set(0.22 + i * 0.16, -0.06, 0.345);
     const kb = mesh(new THREE.CylinderGeometry(0.022, 0.024, 0.025, 24), new THREE.MeshStandardMaterial({ color: 0xd9d4cc, metalness: 1, roughness: 0.25 })); kb.rotation.x = Math.PI / 2; kb.position.z = 0.012; k.add(kb);
     const m = mesh(new THREE.BoxGeometry(0.004, 0.018, 0.004), dark); m.position.set(0, 0.008, 0.026); k.add(m);
-    scene.add(k); knobs.push(k);
+    if (REAL) { k.position.set(0.16 + i * 0.1, 0.012, -0.26); k.rotation.x = -Math.PI / 2; k.scale.setScalar(0.8); }
+    realScene.add(k); knobs.push(k);
   }
   K.cook = cook; K.burner = burner; K.flames = flames; K.flameLight = flameLight; K.knobs = knobs; K.fire = 0;
   K.setFire = v => { K.fire = v; };
@@ -96,7 +100,7 @@ export function buildKitchen(scene) {
   };
 
   // ---- cutting board ----
-  const board = new THREE.Group(); board.position.set(-0.32, 0, -0.02); scene.add(board);
+  const board = new THREE.Group(); board.position.set(-0.32, 0, -0.02); realScene.add(board);
   const bm = mesh(new RoundedBoxGeometry(0.4, 0.022, 0.26, 3, 0.008), new THREE.MeshStandardMaterial({ map: TX.wood(), roughness: 0.55 }));
   bm.position.y = 0.011; board.add(bm);
   K.board = board; K.boardTop = 0.022;
@@ -170,9 +174,9 @@ export function buildKitchen(scene) {
   }
 
   // ---- ingredients staging: veg plate, meat bowl, oil, spices, jug ----
-  K.vegPlate = makePlate(0.11); K.vegPlate.position.set(-0.72, 0, 0.0); scene.add(K.vegPlate);
-  K.meatBowl = new THREE.Group(); K.meatBowl.add(smallBowl(0.09, 0.055, MAT.ceramic)); K.meatBowl.position.set(-0.05, 0, 0.17); scene.add(K.meatBowl);
+  K.vegPlate = makePlate(0.11); K.vegPlate.position.set(-0.72, 0, 0.0); realScene.add(K.vegPlate);
+  K.meatBowl = new THREE.Group(); K.meatBowl.add(smallBowl(0.09, 0.055, MAT.ceramic)); K.meatBowl.position.set(-0.05, 0, 0.17); realScene.add(K.meatBowl);
   K.knife = makeKnife(); K.knife.scale.setScalar(0.9);
-  K.knife.position.set(-0.3, K.boardTop + 0.002, 0.09); K.knife.rotation.set(-Math.PI / 2, 0, 0.05); scene.add(K.knife);
+  K.knife.position.set(-0.3, K.boardTop + 0.002, 0.09); K.knife.rotation.set(-Math.PI / 2, 0, 0.05); realScene.add(K.knife);
   return K;
 }

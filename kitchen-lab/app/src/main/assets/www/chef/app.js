@@ -9,6 +9,9 @@ import { buildKitchen } from './kitchen.js';
 import { makeCharacter, CHEF_INFO } from './character.js';
 import * as F from './food.js';
 import { RECIPES } from './recipes.js';
+import { GLTFLoader } from '../lib/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from '../lib/jsm/libs/meshopt_decoder.module.js';
+import { makeCarla } from '../real/carla.js';
 
 const $ = id => document.getElementById(id);
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -40,18 +43,43 @@ scene.add(new THREE.HemisphereLight(0xfff3e4, 0x4a3426, 0.35));
 const fillL = new THREE.PointLight(0xffd2a8, 0.6, 3, 1.5); fillL.position.set(0.8, 0.8, 1.2); scene.add(fillL);
 
 M.makeMaterials();
-const K = buildKitchen(scene);
+const REAL = QS.get('chef') === 'carla';
+const K = buildKitchen(scene, { real: REAL });
+// realistic kitchen (user's model) placed so that its hob/counter match the recipe space
+let realGLTF = null, carlaGLTF = null, carlaTex = null, kitchenClip = null;
+if (REAL) {
+  const gl = new GLTFLoader(); gl.setMeshoptDecoder(MeshoptDecoder);
+  const tl = new THREE.TextureLoader();
+  const load = u => new Promise((res, rej) => gl.load(u, res, undefined, rej));
+  const ltex = (u, srgb) => new Promise(res => tl.load(u, t => { t.flipY = false; if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; res(t); }));
+  const [kit, carla, dif, norm] = await Promise.all([load('models/kitchen.glb'), load('models/carla.glb'), ltex('models/carla_dif.jpg', true), ltex('models/carla_norm.jpg')]);
+  const g = new THREE.Group(); g.rotation.y = -Math.PI / 2; g.position.set(1.69, -0.895, -1.28);
+  kit.scene.scale.setScalar(0.1); g.add(kit.scene); scene.add(g);
+  // face-on shots: cut away wall cabinets + hood between the camera and the chef
+  kitchenClip = [new THREE.Plane(new THREE.Vector3(0, -1, 0), 0.52), new THREE.Plane(new THREE.Vector3(0, 0, -1), -0.25)];
+  kit.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { m.clippingPlanes = kitchenClip; m.clipIntersection = true; }); } });
+  carlaGLTF = carla; carlaTex = { dif, norm };
+  scene.background = new THREE.Color(0xd9d2c6);
+  key.position.set(-0.6, 3.0, -2.2); key.intensity = 2.0;
+  Object.assign(key.shadow.camera, { left: -1.6, right: 1.6, top: 1.6, bottom: -1.2 }); key.shadow.camera.updateProjectionMatrix();
+  win.position.set(1.5, 1.2, -1.5); win.intensity = 0.6;
+  const hood = new THREE.SpotLight(0xfff1d6, 5, 1.6, 0.9, 0.6, 1.5); hood.position.set(0.33, 0.6, -0.05); hood.target.position.set(0.33, 0, -0.1); scene.add(hood, hood.target);
+  const under = new THREE.PointLight(0xffe8d0, 1.4, 2.5, 1.5); under.position.set(0.1, 0.5, 0.2); scene.add(under);
+  scene.environmentIntensity = 0.65;
+}
 
 // ---------------- chef ----------------
-const chefId = ['leyla', 'zeynep', 'aylin'].includes(QS.get('chef')) ? QS.get('chef') : 'zeynep';
-const ch = makeCharacter(chefId);
-ch.root.position.set(0, 0, -0.56);
+const chefId = REAL ? 'carla' : ['leyla', 'zeynep', 'aylin'].includes(QS.get('chef')) ? QS.get('chef') : 'zeynep';
+const ch = REAL ? makeCarla(carlaGLTF, carlaTex, () => camera) : makeCharacter(chefId);
+const STATION = REAL ? { stove: { p: V(0.2, 0, -0.5), r: 0 }, board: { p: V(0.02, 0, -0.43), r: -Math.PI / 2 } } : { stove: { p: V(0, 0, -0.56), r: 0 }, board: { p: V(0, 0, -0.56), r: 0 } };
+ch.root.position.copy(STATION.stove.p);
 scene.add(ch.root);
-const CHEF = CHEF_INFO[chefId];
+const CHEF = REAL ? { name: 'Carla', voice: { pitch: 1.05, rate: 0.97 } } : CHEF_INFO[chefId];
 
 // ---------------- props for the recipe ----------------
 const R = RECIPES[QS.get('r') || 'etsote'];
-const pan = F.makeSautePan(); pan.position.set(K.cook.position.x, 0.044, K.cook.position.z); pan.rotation.y = 0.85; scene.add(pan);
+if (REAL) K.burner.position.y = -0.03;
+const pan = F.makeSautePan(); pan.position.set(K.cook.position.x, REAL ? 0.032 : 0.044, K.cook.position.z); pan.rotation.y = 0.85; scene.add(pan);
 const lid = F.makeLid(); scene.add(lid);
 const onion = F.wholeOnion(), pepper = F.wholePepper(), tomato = F.wholeTomato(), garlic = F.wholeGarlic(), parsley = F.parsleyBunch();
 const oil = F.oilBottle(), paste = F.pasteJar(), salt = F.spiceBowl(0xffffff), black = F.spiceBowl(0x2a2420), water = F.waterGlass();
@@ -89,6 +117,15 @@ home(oil, [0.66, 0, -0.34]); home(paste, [0.12, 0, -0.33]); home(salt, [0.02, 0,
 home(spoon, [0.12, 0.01, -0.02], [0, 0.6, 0]); home(lid, [0.66, 0.072, -0.02], [0.08, 0, 0.1]); home(K.knife, [0.06, K.boardTop + 0.002, 0.06], [-Math.PI / 2, 0, 0.3]);
 home(K.board, [-0.05, 0, -0.1]); home(K.meatBowl, [-0.42, 0, 0.06]); home(plate, [-0.02, 0, 0.1]);
 K.vegPlate.position.set(-0.58, 0, -0.2);
+if (REAL) {
+  const R2 = { onion: [-0.34, 0.012, -0.8], pepper: [-0.44, 0.012, -0.7, 0.5], tomato: [-0.27, 0.012, -0.72], garlic: [-0.42, 0.012, -0.88], parsley: [-0.3, 0.012, -0.92, 0.4],
+    oil: [-0.52, 0, -0.08], paste: [-0.44, 0, -0.2], salt: [-0.52, 0, -0.3], black: [-0.6, 0, -0.24], water: [-0.62, 0, -0.08], spoon: [-0.24, 0.01, -0.16, 0.6], lid: [0.62, 0.075, 0.02, 0.08],
+    board: [-0.33, 0, -0.42, -Math.PI / 2], meatBowl: [-0.09, 0, -0.1], plate: [-0.34, 0, -0.45] };
+  const objs = { onion, pepper, tomato, garlic, parsley, oil, paste, salt, black, water, spoon, lid, board: K.board, meatBowl: K.meatBowl, plate };
+  for (const [k, v] of Object.entries(R2)) { const o = objs[k]; const h = HOME.get(o); h.p.set(v[0], v[1], v[2]); if (v[3] !== undefined) h.r.set(k === 'lid' ? v[3] : 0, k === 'lid' ? 0 : v[3], 0); }
+  HOME.get(K.knife).p.set(-0.3, K.boardTop + 0.002, -0.32); HOME.get(K.knife).r.set(-Math.PI / 2, 0, -Math.PI / 2 + 0.3);
+  K.vegPlate.position.set(-0.35, 0, -0.8);
+}
 function resetScene() {
   FOLLOW.clear();
   for (const [o, h] of HOME) { scene.attach(o); o.position.copy(h.p); o.rotation.copy(h.r); o.visible = true; o.scale.setScalar(1); }
@@ -103,7 +140,7 @@ function resetScene() {
   pan.userData.oil.material.opacity = 0; pan.userData.setLiquid(0, 0xc0502a, 0); panLevel = 0;
   oilStream.hide(); waterStream.hide();
   ['sizzle', 'boil', 'steam'].forEach(l => setLoop(l, 0));
-  ch.root.rotation.y = 0; ch.rest(100); ch.look(null); ch.mood = 'happy'; ch.arms.R.roll = ch.arms.L.roll = 0;
+  ch.root.rotation.y = STATION.stove.r; ch.root.position.copy(STATION.stove.p); ch.rest(100); ch.look(null); ch.mood = 'happy'; ch.arms.R.roll = ch.arms.L.roll = 0;
   ST.stir = 0; ST.heat = 0; ST.boil = 0; ST.steam = 0;
 }
 const ST = { stir: 0, heat: 0, boil: 0, steam: 0, stirA: 0 };
@@ -120,17 +157,37 @@ const SHOT = {
   stove: { p: [0.42, 0.42, 0.62], t: [0.3, 0.06, -0.16], h: 50 },
   plate: { p: [0.0, 0.55, 0.62], t: [-0.02, 0.03, 0.08], h: 40 },
 };
+if (REAL) Object.assign(SHOT, {
+  front: { p: [0.62, 0.62, 0.3], t: [0.24, 0.42, -0.5], h: 68 },
+  face: { p: [0.4, 0.7, 0.15], t: [0.2, 0.62, -0.5], h: 40 },
+  board: { p: [-0.85, 0.8, -0.38], t: [-0.2, 0.2, -0.44], h: 62 },
+  pan: { p: [0.33, 0.52, 0.22], t: [0.33, 0.035, -0.12], h: 54 },
+  stove: { p: [0.62, 0.42, 0.26], t: [0.22, 0.12, -0.3], h: 64 },
+  plate: { p: [-0.75, 0.62, -0.4], t: [-0.3, 0.03, -0.45], h: 52 },
+  wide: { p: [-1.45, 0.76, -2.2], t: [0.35, 0.1, -0.3], h: 52 },
+});
 let view = 'front';
 function shot(name, dur = 1.2) {
   const s = SHOT[name]; view = name;
   const p0 = cam.p.clone(), t0 = cam.t.clone(), h0 = cam.h, p1 = V(...s.p), t1 = V(...s.t);
-  $('pip').classList.toggle('hide', !['board', 'pan', 'stove', 'plate'].includes(name));
+  $('pip').classList.toggle('hide', !['board', 'pan', 'stove', 'plate', 'wide'].includes(name));
   return T(dur, k => { cam.p.lerpVectors(p0, p1, k); cam.t.lerpVectors(t0, t1, k); cam.h = lerp(h0, s.h, k); });
 }
 function setShot(name) { const s = SHOT[name]; view = name; cam.p.set(...s.p); cam.t.set(...s.t); cam.h = s.h; }
 const camDir = V(), look = V();
 function applyCamera(time) {
   const aspect = innerWidth / innerHeight;
+  if (REAL) {
+    // fixed real room: no dolly (walls!), cam.h is the vertical field of view
+    camera.fov = cam.h * (aspect > 1 ? 0.7 : 1); camera.aspect = aspect; camera.updateProjectionMatrix();
+    const a = 0.002, sx = Math.sin(time * 0.7) * a, sy = Math.sin(time * 0.53 + 1) * a * 0.7;
+    camera.position.set(cam.p.x + sx, cam.p.y + sy, cam.p.z); look.set(cam.t.x, cam.t.y, cam.t.z); camera.lookAt(look);
+    renderer.localClippingEnabled = view !== 'wide';
+    ch.head.getWorldPosition(look);
+    const f = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), ch.root.rotation.y);
+    pipCam.position.copy(look).addScaledVector(f, 0.75).add(new THREE.Vector3(0, 0.02, 0)); pipCam.lookAt(look.x, look.y - 0.08, look.z);
+    return;
+  }
   const hRad = THREE.MathUtils.degToRad(cam.h);
   let vf = 2 * Math.atan(Math.tan(hRad / 2) / aspect), k = 1;
   const vMax = THREE.MathUtils.degToRad(view === 'front' ? 58 : 50);
@@ -154,14 +211,19 @@ function H(fn) { const g = GEN; const h = (dt, t) => { if (g !== GEN) { hooks.de
 const both = (...p) => Promise.all(p);
 function moveTo(o, to, d = 0.8, e = ease.inOut, arc = 0) { const p0 = o.position.clone(); return T(d, k => { o.position.lerpVectors(p0, to, k); if (arc) o.position.y += Math.sin(k * Math.PI) * arc; }, e); }
 
+async function station(name, d = 1.0) {
+  const st = STATION[name]; const p0 = ch.root.position.clone(), r0 = ch.root.rotation.y;
+  if (p0.distanceTo(st.p) < 0.01 && Math.abs(r0 - st.r) < 0.01) return;
+  await T(d, k => { ch.root.position.lerpVectors(p0, st.p, k); ch.root.rotation.y = lerp(r0, st.r, k); }, ease.inOut);
+}
 // attach a prop to a hand grip with a local offset
 // a held prop keeps its own (world) orientation and follows the hand; gp = grip point in the prop's model space
 const FOLLOW = new Map();
 function hold(o, side, gp = [0, 0, 0], rot = [0, 0, 0]) {
   scene.attach(o); o.rotation.set(...rot);
-  FOLLOW.set(o, { side, gp: V(...gp) });
+  FOLLOW.set(o, { side, gp: V(...gp) }); ch.setGrip && ch.setGrip(side, 0.95);
 }
-function drop(o) { FOLLOW.delete(o); const h = HOME.get(o); scene.attach(o); if (h) { o.position.copy(h.p); o.rotation.copy(h.r); } }
+function drop(o) { const f = FOLLOW.get(o); if (f && ch.setGrip) ch.setGrip(f.side, 0.25); FOLLOW.delete(o); const h = HOME.get(o); scene.attach(o); if (h) { o.position.copy(h.p); o.rotation.copy(h.r); } }
 const _g = V(), _q = new THREE.Quaternion();
 function followFrame() {
   for (const [o, f] of FOLLOW) {
@@ -182,7 +244,7 @@ async function grab(o, side, pos, rot, d = 0.55) {
 let speakSeq = 0, speakDone = null;
 window.LAB_TTS_DONE = id => { if (+id === speakSeq && speakDone) { const f = speakDone; speakDone = null; f(); } };
 function fill(s) {
-  const hey = { leyla: 'Kuzum', zeynep: 'Canım', aylin: 'Arkadaşlar' }[chefId];
+  const hey = { leyla: 'Kuzum', zeynep: 'Canım', aylin: 'Arkadaşlar', carla: 'Arkadaşlar' }[chefId];
   return s.replace(/\{hey\}/g, hey).replace(/\{name\}/g, CHEF.name);
 }
 function caption(text, note = '') { $('subName').textContent = CHEF.name; $('subText').textContent = text; $('subNote').textContent = note; }
@@ -307,11 +369,12 @@ const stepState = { waitingTimer: false };
 function ctx(i) {
   return {
     i, say, W, T, H, shot, moveTo, both, hold, drop, grab, isHeld, reachTo, wp, ch, K, P, pan, lid, plate, spoon, oil, paste, salt, black, water, onion, pepper, tomato, garlic, parsley,
-    ST, sfx, setLoop, vib, startTimer: (min, label) => startTimer(i, min, label), timerFrac, stepState, oilStream, waterStream,
+    ST, sfx, setLoop, vib, REAL, station, boardHome: () => HOME.get(K.board), startTimer: (min, label) => startTimer(i, min, label), timerFrac, stepState, oilStream, waterStream,
     saltP, pepP, steamP, spitP, setPanLevel: v => panLevel = v, F, M, V, rand, ease, lerp, clamp, chefId,
     waitTimer: async (t, onP, lines = []) => {
-      stepState.waitingTimer = true; let said = 0;
+      stepState.waitingTimer = true; let said = 0, dirT = 0, dirI = 0;
       while (true) {
+        if (REAL && (dirT += 0.1) > 7 && !ch.speaking) { dirT = 0; shot(['wide', 'front', 'pan'][dirI++ % 3], 1.4).catch(() => { }); }
         const k = timerFrac(t); onP(k);
         if (said < lines.length && k >= lines[said][0]) { const l = lines[said++][1]; say(l).catch(() => { }); }
         if (t.fired || k >= 1) break;
@@ -411,7 +474,7 @@ window.LAB = {
   back() { if (alarmOn) { stopAlarm(); return true; } stopSpeech(); location.href = 'index.html'; return true; },
   pause() { stopSpeech(); ['sizzle', 'boil', 'steam'].forEach(l => setLoop(l, 0)); },
   state: () => ({ step: cur, view, timers: timers.map(t => [t.label, Math.round((t.end - now()) / 1000), t.fired]) }),
-  go, next, shot: setShot,
+  go, next, shot: setShot, ch, V,
 };
 
 // ---------------- start ----------------

@@ -14,27 +14,49 @@ async function chop(c, whole, type, dur, line) {
   const { ch, K, P } = c;
   const b = K.board;
   if (line) c.say(line).catch(() => { });
-  // put the vegetable on the board (left hand carries it)
-  const spot = b.localToWorld(V(-0.07, K.boardTop, 0.0));
-  c.ch.reach('L', whole.getWorldPosition(V()).add(V(0, 0.06, 0)), 7);
+  await c.station('board');
+  const th = ch.root.rotation.y, Y = V(0, 1, 0);
+  const AX = V(1, 0, 0).applyAxisAngle(Y, th), FW = V(0, 0, 1).applyAxisAngle(Y, th); // AX = chef's left, FW = forward
+  const at = (base, a, y, f) => base.clone().addScaledVector(AX, a).add(V(0, y, 0)).addScaledVector(FW, f);
+  // the vegetable goes to the middle of the board, right in front of the chef
+  const spot = b.getWorldPosition(V()); spot.y = K.boardTop; spot.addScaledVector(FW, -0.02);
+  ch.reach('L', whole.getWorldPosition(V()).add(V(0, 0.06, 0)), 7);
   await c.W(0.4);
-  await c.both(c.moveTo(whole, spot, 0.7, c.ease.inOut, 0.08), (async () => { for (let i = 0; i < 14; i++) { ch.reach('L', whole.getWorldPosition(V()).add(V(0, 0.05, 0)), 14); await c.W(0.05); } })());
-  // knife in the right hand
-  if (!c.isHeld(K.knife)) await c.grab(K.knife, 'R', ...KNIFE);
+  await c.both(c.moveTo(whole, spot, 0.7, c.ease.inOut, 0.08), (async () => { for (let i = 0; i < 14; i++) { ch.reach('L', whole.getWorldPosition(V()).add(V(0, 0.06, 0)), 14); await c.W(0.05); } })());
+  // knife in the right hand: blade forward, edge down, fingers around the handle
+  const KN = [[-0.05, 0.016, 0], [0, th - Math.PI / 2, 0]];
+  if (!c.isHeld(K.knife)) await c.grab(K.knife, 'R', ...KN); else K.knife.rotation.set(...KN[1]);
+  if (ch.handPose) {
+    ch.handPose('R', FW.clone().add(V(0, -0.35, 0)), AX.clone());            // palm faces the middle, knuckles up
+    ch.handPose('L', FW.clone().multiplyScalar(0.75).add(V(0, -0.65, 0)).addScaledVector(AX, -0.25), FW.clone().multiplyScalar(-0.65).add(V(0, -0.75, 0))); // claw on top of the vegetable
+  }
   const ps = P[type].board, n = ps.max;
-  const cuts = Math.max(6, Math.round(dur / 0.28));
+  const cuts = Math.max(6, Math.round(dur / 0.3));
+  const BLADE = 0.11; // grip → middle of the blade
   const w0 = spot.clone();
+  b.updateMatrixWorld(true);
+  let shown = 0;
   for (let i = 0; i < cuts; i++) {
     const k = (i + 1) / cuts;
-    const x = w0.x + 0.03 - k * 0.06;
-    ch.reach('L', V(w0.x - 0.04, w0.y + 0.05, w0.z + 0.01), 10);
-    ch.reach('R', V(x + 0.02, w0.y + 0.1, w0.z + 0.06), 16);
-    await c.W(0.13);
-    ch.reach('R', V(x + 0.02, w0.y + 0.035, w0.z + 0.06), 22);
+    const xc = -0.04 + k * 0.06;                        // cut line moves from the right end toward the holding hand
+    const cut = at(w0, xc, 0, 0);
+    ch.reach('L', at(w0, xc + 0.045, 0.055, 0.0), 10);    // other hand holds the rest, just left of the knife
+    ch.reach('R', cut.clone().addScaledVector(FW, -BLADE).add(V(0, 0.085, 0)), 16);
+    c.T(0.12, q => K.knife.rotation.z = 0.12 * q);
+    await c.W(0.14);
+    ch.reach('R', cut.clone().addScaledVector(FW, -BLADE).add(V(0, 0.022, 0)), 24);
+    c.T(0.1, q => K.knife.rotation.z = 0.12 - 0.17 * q);
     await c.W(0.12);
     c.sfx.chop(); c.vib(6);
-    ps.count = Math.round(k * n);
-    whole.scale.set(Math.max(0.05, 1 - k), 1, 1);
+    const want = Math.round(k * n);
+    for (; shown < want; shown++) {
+      const it = ps.items[shown];
+      const wpnt = at(w0, xc - 0.012 - Math.random() * 0.02, 0, c.rand(-0.03, 0.03));
+      it.p.copy(b.worldToLocal(wpnt)); it.p.y = K.boardTop + 0.004;
+    }
+    ps.count = want;
+    whole.scale.set(Math.max(0.05, 1 - k * 0.95), 1, 1);
+    whole.position.copy(at(w0, k * 0.025, 0, 0));
   }
   whole.visible = false;
 }
@@ -66,14 +88,18 @@ async function boardToPan(c, types, line) {
   if (line) c.say(line).catch(() => { });
   if (c.isHeld(c.K.knife)) c.drop(c.K.knife);
   const h = c.H(() => { ch.reach('L', b.localToWorld(V(0.19, 0.03, 0)), 20); ch.reach('R', b.localToWorld(V(-0.19, 0.03, 0)), 20); });
+  if (c.REAL) { await c.station('board', 0.8); }
   await c.W(0.4);
-  await c.both(turn(c, 0.42, 0.8), c.moveTo(b, pan.localToWorld(V(-0.05, 0.14, 0.0)).add(V(-0.17, 0, 0.03)), 0.9, c.ease.inOut, 0.05));
+  const r0 = b.rotation.y;
+  await c.both(c.REAL ? c.station('stove', 0.9) : turn(c, 0.42, 0.8), c.moveTo(b, pan.localToWorld(V(-0.05, 0.14, 0.0)).add(V(-0.17, 0, 0.03)), 0.9, c.ease.inOut, 0.05), c.T(0.9, k => b.rotation.y = c.lerp(r0, 0, k)));
+  if (c.REAL) await turn(c, 0.42, 0.5);
   await c.T(0.5, k => b.rotation.z = -k * 0.55);
   c.sfx.sizzleBurst();
   await Promise.all(types.map(t => fly(c, c.P[t].board, c.P[t].pan, c.P[t].board.count, 0.6, 0.6)));
   await c.T(0.4, k => b.rotation.z = -(1 - k) * 0.55);
-  await c.both(turn(c, 0, 0.8), c.moveTo(b, V(...BOARD_AT), 0.9, c.ease.inOut, 0.05));
-  h(); ch.rest();
+  const home = c.boardHome();
+  if (c.REAL) { h(); ch.rest(); await c.both(c.moveTo(b, home.p.clone(), 0.9, c.ease.inOut, 0.05), c.T(0.9, k => b.rotation.y = c.lerp(0, home.r.y, k)), turn(c, 0, 0.8)); }
+  else { await c.both(turn(c, 0, 0.8), c.moveTo(b, home.p.clone(), 0.9, c.ease.inOut, 0.05)); h(); ch.rest(); }
 }
 function boardToPanApply(c, types) { for (const t of types) { const P = c.P[t]; P.pan.count = P.board.count || P.board.max; P.board.count = 0; } }
 
@@ -81,6 +107,12 @@ function boardToPanApply(c, types) { for (const t of types) { const P = c.P[t]; 
 function startStir(c, amp = 1) {
   const { ch, pan, spoon } = c;
   if (!c.isHeld(spoon)) c.hold(spoon, 'R', ...SPOON);
+  if (ch.handPose) {
+    const th = ch.root.rotation.y, Y = V(0, 1, 0);
+    const AX = V(1, 0, 0).applyAxisAngle(Y, th), FW = V(0, 0, 1).applyAxisAngle(Y, th);
+    ch.handPose('R', FW.clone().multiplyScalar(0.4).add(V(0, -1, 0)), AX.clone());
+    ch.handPose('L', FW.clone().add(AX.clone().multiplyScalar(0.6)).add(V(0, -0.3, 0)), V(0, -1, 0));
+  }
   let a = 0;
   return c.H((dt) => {
     a += dt * 2.6 * amp;
@@ -331,8 +363,8 @@ const etsote = {
         ch.rest(); await turn(c, 0);
         // board aside, plate in its place
         await c.say('Tabağımızı hazırlayalım.');
-        await c.moveTo(K.board, V(-0.55, 0, 0.12), 0.6);
-        plate.position.set(-0.04, 0, -0.08); plate.visible = true; plate.scale.setScalar(0.01);
+        await c.moveTo(K.board, c.REAL ? V(-0.62, 0, -0.62) : V(-0.55, 0, 0.12), 0.6);
+        if (c.REAL) plate.position.copy(c.boardHome().p); else plate.position.set(-0.04, 0, -0.08); plate.visible = true; plate.scale.setScalar(0.01);
         await c.T(0.4, k => plate.scale.setScalar(Math.max(0.01, k)), c.ease.outBack);
         c.shot('plate', 0.9);
         c.hold(c.spoon, 'R', ...SPOON);
