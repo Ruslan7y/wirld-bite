@@ -41,7 +41,7 @@ let chef='zeynep'; try{chef=localStorage.getItem('lab_chef')||'zeynep'}catch(e){
 function drawChefs(){document.getElementById('chefs').innerHTML=CH.map(([id,n,t])=>`<div class="chef ${id===chef?'on':''}" data-id="${id}"><svg viewBox="0 0 200 240">${face[id]}${mouth}</svg><b>${n}</b><small>${t}</small></div>`).join('')}
 drawChefs();
 document.getElementById('chefs').onclick=e=>{const c=e.target.closest('.chef');if(!c)return;chef=c.dataset.id;try{localStorage.setItem('lab_chef',chef)}catch(e){}drawChefs()};
-const R=[['chef.html?r=etsote','🥩','Et sote','Şefle birlikte · 11 adım · ~1 saat · gerçek zamanlayıcı ve alarm',true],['cake.html','🎂','Çilekli vanilyalı kek','Sinematik prototip · 14 adım · film gibi izle ya da kendin yap']];
+const R=[['real.html','🏠','Gerçekçi mutfak (deneme)','Gerçek mutfak modeli + Renderpeople Carla · tava başında karıştırıyor · 3 kamera',true],['chef.html?r=etsote','🥩','Et sote','Şefle birlikte · 11 adım · ~1 saat · gerçek zamanlayıcı ve alarm',true],['cake.html','🎂','Çilekli vanilyalı kek','Sinematik prototip · 14 adım · film gibi izle ya da kendin yap']];
 document.getElementById('recipes').innerHTML=R.map(([u,e,n,d,nw])=>`<div class="card ${nw?'new':''}" data-u="${u}"><div class="e">${e}</div><div><b>${n}${nw?'<span class="tag">YENİ</span>':''}</b><small>${d}</small></div></div>`).join('');
 document.getElementById('recipes').onclick=e=>{const c=e.target.closest('.card');if(c)location.href=c.dataset.u+(c.dataset.u.includes('?')?'&':'?')+'chef='+chef};
 window.LAB={back:()=>false};

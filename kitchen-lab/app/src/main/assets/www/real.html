@@ -1,0 +1,14 @@
+<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Gerçekçi mutfak · deneme</title>
+<style>*{margin:0;padding:0}html,body{height:100%;overflow:hidden;background:#111}#c{position:fixed;inset:0;width:100%;height:100%}
+#ld{position:fixed;inset:0;display:grid;place-items:center;color:#fff;font:15px system-ui;background:#111;transition:opacity .6s}
+#cap{position:fixed;left:12px;right:12px;bottom:18px;background:rgba(15,10,8,.75);color:#fff;font:16px/1.4 system-ui;padding:12px 14px;border-radius:16px}
+#cap b{display:block;font-size:11px;color:#ff7a45;letter-spacing:.08em}
+#views{position:fixed;top:12px;left:12px;right:12px;display:flex;gap:6px}#views button{flex:1;border:0;border-radius:12px;padding:9px;background:rgba(20,15,10,.6);color:#fff;font:600 13px system-ui}
+#views button.on{background:#ff7a45}</style>
+<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js" } }</script></head>
+<body><canvas id="c"></canvas><div id="ld">Gerçekçi mutfak yükleniyor…</div>
+<div id="views"><button data-v="front" class="on">Karşıdan</button><button data-v="pan">Tava</button><button data-v="wide">Mutfak</button><button onclick="location.href='index.html'">✕</button></div>
+<div id="cap"><b>CARLA</b><span id="capT">Merhaba! Bugün gerçek mutfakta et sote yapıyoruz.</span></div>
+<script type="module" src="real/proto.js"></script></body></html>
