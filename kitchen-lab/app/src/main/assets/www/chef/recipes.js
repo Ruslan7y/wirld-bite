@@ -237,7 +237,7 @@ const etsote = {
     },
     {
       title: 'Soğanı kavur',
-      apply(c) { boardToPanApply(c, ['onion']); c.P.onion.pan.done = 0.8; c.P.meat.pan.done = 0.9; c.ST.heat = 0.8; },
+      apply(c) { boardToPanApply(c, ['onion']); c.P.onion.pan.done = 0.8; c.P.meat.pan.done = 0.9; },
       async play(c) {
         const { ch, P } = c;
         c.ST.heat = 0.8; c.shot('front', 0.8); ch.look(V(0, 0.5, 2));
@@ -354,6 +354,7 @@ const etsote = {
       apply(c) { },
       async play(c) {
         const { ch, P, pan, lid, plate, K } = c;
+        c.ST.heat = 0; c.ST.boil = 0; c.ST.steam = 0.3; c.quiet(true);
         c.shot('stove', 0.8); ch.look(pan.getWorldPosition(V()));
         await c.say('Ocağı kapatıyoruz.');
         await c.reachTo('L', K.knobs[0].getWorldPosition(V()).add(V(0, 0.03, 0.02)), 0.6);
@@ -429,7 +430,6 @@ const etsote = {
         } else { c.shot('front', 1.2); ch.look(V(0, 0.5, 2)); }
         ch.cheer(); c.sfx.success(); c.vib(40);
         await c.say('İşte et sotemiz hazır! Ellerine sağlık, afiyet olsun {hey}!', 'Yanına pilav ya da közlenmiş biber çok yakışır.');
-        if (c.GHOST) await c.ghostFinale();
       },
     },
   ],

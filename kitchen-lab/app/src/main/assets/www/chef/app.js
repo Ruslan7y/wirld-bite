@@ -183,9 +183,9 @@ function resetScene() {
   ch.root.rotation.y = STATION.stove.r; ch.root.position.copy(STATION.stove.p); ch.rest(100);
   if (guest) { guest.rest(100); guest.look(null); guest.mood = 'happy'; guest.speaking = false; }
   if (FORK) FORK.visible = false; ch.look(null); ch.mood = 'happy'; ch.arms.R.roll = ch.arms.L.roll = 0;
-  ST.stir = 0; ST.heat = 0; ST.boil = 0; ST.steam = 0;
+  ST.stir = 0; ST.heat = 0; ST.boil = 0; ST.steam = 0; ST.lastHeat = 0; ST.quiet = false;
 }
-const ST = { stir: 0, heat: 0, boil: 0, steam: 0, stirA: 0 };
+const ST = { stir: 0, heat: 0, boil: 0, steam: 0, stirA: 0, boostAt: -99, lastHeat: 0, quiet: false };
 
 // ---------------- cameras ----------------
 const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 30);
@@ -344,7 +344,7 @@ const saveTimers = () => { try { localStorage.setItem(TKEY, JSON.stringify(timer
 let simNow = Date.now(); // advances FF times faster in tests
 function now() { return simNow; }
 function startTimer(stepIdx, min, label) {
-  let t = timers.find(t => t.step === stepIdx && t.r === R.id && !t.fired);
+  let t = timers.find(t => t.step === stepIdx && t.r === R.id && !t.dismissed);
   if (t) return t;
   t = { id: (Date.now() % 1e8) + stepIdx, step: stepIdx, r: R.id, label, total: min * 60e3, end: now() + min * 60e3, fired: false };
   timers.push(t); saveTimers();
@@ -452,7 +452,7 @@ let cur = -1;
 const stepState = { waitingTimer: false };
 function ctx(i) {
   return {
-    i, say, W, T, H, shot, guest, scene, GHOST, ghostFinale, fork: () => FORK || (FORK = (() => { const f = M.makeFork(); scene.add(f); return f; })()), moveTo, both, hold, drop, grab, isHeld, release: o => { const f = FOLLOW.get(o); if (f && ch.setGrip) ch.setGrip(f.side, 0.25); FOLLOW.delete(o); }, TABLE, reachTo, wp, ch, K, P, pan, lid, plate, spoon, oil, paste, salt, black, water, onion, pepper, tomato, garlic, parsley,
+    i, say, W, T, H, shot, guest, scene, GHOST, ghostFinale, quiet: v => { ST.quiet = v; }, fork: () => FORK || (FORK = (() => { const f = M.makeFork(); scene.add(f); return f; })()), moveTo, both, hold, drop, grab, isHeld, release: o => { const f = FOLLOW.get(o); if (f && ch.setGrip) ch.setGrip(f.side, 0.25); FOLLOW.delete(o); }, TABLE, reachTo, wp, ch, K, P, pan, lid, plate, spoon, oil, paste, salt, black, water, onion, pepper, tomato, garlic, parsley,
     ST, sfx, setLoop, vib, REAL, station, boardHome: () => HOME.get(K.board), startTimer: (min, label) => startTimer(i, min, label), timerFrac, stepState, oilStream, waterStream,
     saltP, pepP, steamP, spitP, setPanLevel: v => panLevel = v, F, M, V, rand, ease, lerp, clamp, chefId,
     waitTimer: async (t, onP, lines = []) => {
@@ -472,6 +472,8 @@ async function go(i, replay = false) {
   i = clamp(i, 0, R.steps.length - 1);
   GEN++; const g = GEN; stopSpeech(); cur = i; setUI(i); stepState.waitingTimer = false;
   resetScene();
+  saveProgress(i);
+  if (GHOST && !ghostSaid && i === Math.floor(R.steps.length / 2)) { ghostSaid = true; setTimeout(() => { if (cur === i) ghostFinale(); }, AUTO ? 3000 : 9000); }
   for (let j = 0; j < i; j++) R.steps[j].apply(ctx(j));
   P_sync();
   try {
@@ -481,7 +483,7 @@ async function go(i, replay = false) {
 }
 function next() {
   sfx.tap();
-  if (cur >= R.steps.length - 1) { if (AUTO) return; stopSpeech(); location.href = 'index.html' + (GHOST ? '?ghost=1' : ''); return; }
+  if (cur >= R.steps.length - 1) { if (AUTO) return; clearProgress(); stopSpeech(); location.href = 'index.html' + (GHOST ? '?ghost=1' : ''); return; }
   go(cur + 1);
 }
 function prev() { sfx.tap(); if (cur > 0) go(cur - 1); }
@@ -520,14 +522,18 @@ function cookFrame(dt, time) {
     const a = rand(0, 6.28), r = rand(0, 0.1);
     steamP.emit(V(pc.x + Math.cos(a) * r, pc.y + 0.06 + panLevel, pc.z + Math.sin(a) * r), V(rand(-0.01, 0.01), rand(0.05, 0.09), rand(-0.01, 0.01)), { life: 2.4, size: 0.04, size1: 0.14, alpha: 0.5 });
   }
-  setLoop('sizzle', ST.heat); setLoop('boil', ST.boil); setLoop('steam', ST.steam * 0.6);
+  if (ST.heat > ST.lastHeat + 0.15) ST.boostAt = time;
+  ST.lastHeat = ST.heat;
+  const boost = 0.18 + 0.82 * clamp(1 - (time - ST.boostAt) / 3);
+  const mute = ST.quiet ? 0 : 1;
+  setLoop('sizzle', ST.heat * boost * mute); setLoop('boil', ST.boil * 0.5 * mute); setLoop('steam', ST.steam * 0.4 * mute);
   // oil shimmer
   const om = pan.userData.oil.material; if (om.bumpMap) om.bumpMap.offset.set(Math.sin(time * 0.7) * 0.05, time * 0.03);
   const lm = pan.userData.liquid.material; if (lm.bumpMap) { lm.bumpMap.rotation = time * 0.2 * (ST.boil + ST.stir); lm.bumpMap.offset.y = time * 0.05 * ST.boil; }
 }
 
 // ---------------- ghost (separate edition) ----------------
-let ghost = null, ghostBusy = false, ghostNext = 18;
+let ghost = null, ghostBusy = false, ghostNext = 18, ghostSaid = false;
 if (GHOST) {
   const tex = new THREE.TextureLoader().load('models/ghost.png'); tex.colorSpace = THREE.SRGBColorSpace;
   ghost = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, depthTest: false }));
@@ -578,7 +584,7 @@ async function ghostFinale() {
   await new Promise(r => setTimeout(r, 900));
   clearInterval(hold); ghostBubble('', false);
   await tween(1.2, k => ghostAt(k * 1.3, 0.05 + k * 0.3, 1.05 + k * 0.4, 0.33, (1 - k) * 0.92), ease.in);
-  ghost.visible = false; ghostBusy = false; ghostNext = 999;
+  ghost.visible = false; ghostBusy = false; ghostNext = rand(25, 45);
 }
 
 // ---------------- render loop ----------------
@@ -618,6 +624,12 @@ window.LAB = {
   go, next, shot: setShot, ch, V, TABLE: () => TABLE, ghostFly, ghostFinale, gstate: () => ghost ? [ghostBusy, ghost.visible, +ghost.material.opacity.toFixed(2), ghost.position.clone().project(camera).toArray().map(v => +v.toFixed(2)), ghost.material.map.image ? ghost.material.map.image.width : 'noimg', ghost.scale.toArray()] : 'none', cam: (p, t, h) => { SHOT.dbg = { p, t, h }; setShot('dbg'); },
 };
 
+// ---------------- resume where the user left off ----------------
+const PKEY = 'lab_progress';
+function saveProgress(i) { try { localStorage.setItem(PKEY, JSON.stringify({ r: R.id, chef: chefId, step: i, ghost: GHOST, at: Date.now() })); } catch (e) { } }
+function loadProgress() { try { const p = JSON.parse(localStorage.getItem(PKEY) || 'null'); if (p && p.r === R.id && p.chef === chefId && Date.now() - p.at < 6 * 3600e3 && p.step > 0) return p; } catch (e) { } return null; }
+function clearProgress() { try { localStorage.removeItem(PKEY); } catch (e) { } }
+
 // ---------------- start ----------------
 $('pipName').textContent = CHEF.name;
 $('stTitle').textContent = R.title;
@@ -628,6 +640,17 @@ caption(fill('Merhaba! Hazır olduğunda “Başlayalım”a dokun.'));
 ch.look(V(0, 0.5, 2));
 frame();
 requestAnimationFrame(() => { $('loading').style.opacity = 0; setTimeout(() => $('loading').remove(), 800); });
-const begin = () => { unlock(); $('startOv').classList.add('hide'); go(+(QS.get('step') || 0)); };
-$('bStart').onclick = begin;
-if (AUTO) setTimeout(begin, 1500);
+const begin = (step) => { unlock(); $('startOv').classList.add('hide'); go(step ?? +(QS.get('step') || 0)); };
+const prog = !QS.has('step') && !AUTO ? loadProgress() : null;
+if (prog) {
+  const live = timers.find(t => t.r === R.id && !t.dismissed);
+  const b = document.createElement('button'); b.className = 'primary'; b.id = 'bResume';
+  b.innerHTML = `▶ Kaldığın yerden devam et<small style="display:block;font-size:12px;opacity:.85;font-weight:500">Adım ${prog.step + 1}: ${R.steps[prog.step].title}${live ? ' · ⏱ ' + live.label + ' ' + (live.fired ? 'hazır' : fmt(timeLeft(live))) : ''}</small>`;
+  $('bStart').before(b); $('bStart').textContent = 'Baştan başla'; $('bStart').className = 'ghostbtn';
+  b.onclick = () => begin(prog.step);
+  $('bStart').onclick = () => { clearProgress(); begin(0); };
+  if (QS.has('resume')) setTimeout(() => begin(prog.step), 300);
+}
+
+if (!prog) $('bStart').onclick = () => begin();
+if (AUTO) setTimeout(() => begin(), 1500);
