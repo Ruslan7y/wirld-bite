@@ -947,7 +947,7 @@ function intro() {
 }
 $('bAgain').onclick = () => location.reload();
 $('bFree').onclick = () => { $('end').classList.add('hide'); badge('Parmağınla kaydırarak döndür', true, 2500); };
-$('bExit').onclick = () => location.reload();
+$('bExit').onclick = () => location.href = 'index.html';
 $('bIng').onclick = () => { renderIng(); $('sheet').classList.remove('hide'); };
 $('bShClose').onclick = () => $('sheet').classList.add('hide');
 $('bSound').onclick = () => { setMuted(!audio.muted); $('bSound').textContent = audio.muted ? '🔇' : '🔊'; };
@@ -955,7 +955,7 @@ $('bSound').onclick = () => { setMuted(!audio.muted); $('bSound').textContent = 
 window.LAB = {
   back() {
     if (!$('sheet').classList.contains('hide')) { $('sheet').classList.add('hide'); return true; }
-    if (!$('start').classList.contains('hide')) return false;
+    if (!$('start').classList.contains('hide')) { location.href = 'index.html'; return true; }
     location.reload(); return true;
   },
   pause() { stopAllLoops(); },

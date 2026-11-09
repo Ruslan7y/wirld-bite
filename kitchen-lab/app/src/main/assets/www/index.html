@@ -4,64 +4,47 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>World Bite · Kitchen Lab</title>
-<link rel="stylesheet" href="css/lab.css">
-<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js" } }</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{min-height:100vh;background:radial-gradient(120% 70% at 50% 0%,#3a2618 0%,#140f0c 60%);color:#fff8f0;font-family:system-ui,-apple-system,Roboto,sans-serif;padding:calc(env(safe-area-inset-top) + 26px) 18px 30px;user-select:none}
+.k{font-size:11px;letter-spacing:.24em;opacity:.65}
+h1{font-size:28px;margin:6px 0 4px;font-weight:800}
+p.s{opacity:.7;font-size:14px;margin-bottom:22px}
+h2{font-size:13px;letter-spacing:.12em;opacity:.7;margin:20px 0 10px;text-transform:uppercase}
+.chefs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.chef{background:rgba(255,255,255,.06);border:2px solid transparent;border-radius:18px;padding:10px 6px 12px;text-align:center;transition:.2s}
+.chef.on{border-color:#ff7a45;background:rgba(255,122,69,.14)}
+.chef svg{width:74px;height:88px}
+.chef b{display:block;font-size:13px;margin-top:4px}.chef small{font-size:11px;opacity:.6}
+.card{display:flex;gap:14px;align-items:center;background:rgba(255,255,255,.06);border-radius:18px;padding:14px;margin-bottom:10px;border:1px solid rgba(255,255,255,.08)}
+.card .e{font-size:38px;width:56px;height:56px;display:grid;place-items:center;background:rgba(255,255,255,.07);border-radius:14px}
+.card b{font-size:16px}.card small{display:block;opacity:.65;font-size:12px;margin-top:3px;line-height:1.4}
+.card.new{border-color:rgba(255,122,69,.5)}
+.tag{font-size:10px;background:#ff7a45;color:#fff;padding:2px 7px;border-radius:99px;margin-left:6px;vertical-align:2px}
+</style>
 </head>
 <body>
-<canvas id="c"></canvas>
-<div id="touch"></div>
-<div class="vignette"></div>
-<canvas id="grain" width="160" height="160"></canvas>
-<div class="bars"><i></i><i></i></div>
-
-<div id="loading"><div class="ld-ring"></div><p>Mutfak hazırlanıyor…</p></div>
-
-<!-- HUD -->
-<div id="hud" class="hide">
-  <div class="top">
-    <button class="ic" id="bExit" aria-label="Çık">✕</button>
-    <div class="stepbox"><div class="stepn" id="stepN">1 / 14</div><div class="stept" id="stepT">Hazırlık</div>
-      <div class="prog"><i id="progBar"></i></div></div>
-    <button class="ic" id="bIng" aria-label="Malzemeler">📋</button>
-    <button class="ic" id="bSound" aria-label="Ses">🔊</button>
-  </div>
-  <div id="badge" class="badge"></div>
-  <div id="timer" class="timer hide"><div class="tm-ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="54"/><circle id="tmArc" cx="60" cy="60" r="54"/></svg><div><b id="tmTxt">35:00</b><small id="tmSub">175°C · fırın</small></div></div>
-    <div class="tm-btns"><button id="tmFast">⏩ Hızlandır</button></div></div>
-  <div class="bottom">
-    <div id="caption" class="caption"></div>
-    <div id="hint" class="hint hide"><div class="gest" id="gest"></div><span id="hintT"></span></div>
-    <div class="ctrl"><button id="bSkip" class="ghost">Atla ⏭</button></div>
-  </div>
-</div>
-
-<!-- Start -->
-<div id="start" class="panel hide">
-  <div class="st-card">
-    <div class="kicker">WORLD BITE · KITCHEN LAB</div>
-    <h1>Çilekli Vanilyalı Kek</h1>
-    <div class="meta"><span>⏱ 1 sa 5 dk</span><span>🍰 8 dilim</span><span>⭐ Kolay</span></div>
-    <div class="chips" id="chips"></div>
-    <button class="primary" id="bWatch">▶ Film gibi izle</button>
-    <button class="secondary" id="bPlay">👩‍🍳 Kendin yap</button>
-    <p class="note">Gerçek zamanlı 3D sahne · sesli · internetsiz</p>
-  </div>
-</div>
-
-<!-- End -->
-<div id="end" class="panel hide">
-  <div class="st-card">
-    <div class="big">🍰</div>
-    <h1>Afiyet olsun!</h1>
-    <p id="endTxt" class="sub"></p>
-    <button class="primary" id="bAgain">↺ Baştan izle</button>
-    <button class="secondary" id="bFree">🎥 Kameraya dokun ve döndür</button>
-  </div>
-</div>
-
-<!-- Ingredients sheet -->
-<div id="sheet" class="sheet hide"><div class="sh-card"><h3>Malzemeler</h3><ul id="ingList"></ul><button class="secondary" id="bShClose">Kapat</button></div></div>
-
-<script type="module" src="js/main.js"></script>
+<div class="k">WORLD BITE · KITCHEN LAB</div>
+<h1>Mutfağa hoş geldin</h1>
+<p class="s">Şefini seç, tarifi seç; o anlatsın, sen izle ya da birlikte pişirin.</p>
+<h2>Şefin</h2>
+<div class="chefs" id="chefs"></div>
+<h2>Tarifler</h2>
+<div id="recipes"></div>
+<script>
+const CH=[['leyla','Leyla nənə','Sevimli büyükanne'],['zeynep','Zeynep teyze','Sıcak, misafirperver'],['aylin','Şef Aylin','Genç ve neşeli']];
+const face={leyla:`<path d="M30 240 Q30 205 100 200 Q170 205 170 240 Z" fill="#7C4A3A"/><circle cx="100" cy="135" r="52" fill="#F5CFAE"/><path d="M50 130 Q48 78 100 76 Q152 78 150 130 Q140 100 100 100 Q60 100 50 130 Z" fill="#C9CCD3"/><circle cx="100" cy="72" r="20" fill="#C9CCD3"/><circle cx="80" cy="135" r="13" fill="none" stroke="#5B4636" stroke-width="3"/><circle cx="120" cy="135" r="13" fill="none" stroke="#5B4636" stroke-width="3"/><circle cx="80" cy="136" r="5" fill="#2B1D14"/><circle cx="120" cy="136" r="5" fill="#2B1D14"/>`,
+aylin:`<path d="M30 240 Q30 205 100 200 Q170 205 170 240 Z" fill="#fff"/><path d="M78 204 L100 230 L122 204 Z" fill="#E0482F"/><circle cx="100" cy="135" r="50" fill="#EDC09A"/><path d="M52 128 Q54 92 100 90 Q146 92 148 128 Q128 108 100 112 Q72 108 52 128 Z" fill="#4A2C20"/><path d="M52 92 Q48 52 76 50 Q84 26 100 34 Q116 26 124 50 Q152 52 148 92 Z" fill="#fff"/><circle cx="82" cy="136" r="5" fill="#2B1D14"/><circle cx="118" cy="136" r="5" fill="#2B1D14"/>`,
+zeynep:`<path d="M30 240 Q30 205 100 200 Q170 205 170 240 Z" fill="#2F6F62"/><path d="M44 140 Q40 70 100 64 Q160 70 156 140 Q160 196 120 206 L80 206 Q40 196 44 140 Z" fill="#B83A5E"/><ellipse cx="100" cy="140" rx="40" ry="46" fill="#EFC29C"/><path d="M76 136 Q82 129 88 136" fill="none" stroke="#2B1D14" stroke-width="3.5"/><path d="M112 136 Q118 129 124 136" fill="none" stroke="#2B1D14" stroke-width="3.5"/>`};
+const mouth='<path d="M84 160 Q100 178 116 160" fill="none" stroke="#8A3B2E" stroke-width="4" stroke-linecap="round"/>';
+let chef='zeynep'; try{chef=localStorage.getItem('lab_chef')||'zeynep'}catch(e){}
+function drawChefs(){document.getElementById('chefs').innerHTML=CH.map(([id,n,t])=>`<div class="chef ${id===chef?'on':''}" data-id="${id}"><svg viewBox="0 0 200 240">${face[id]}${mouth}</svg><b>${n}</b><small>${t}</small></div>`).join('')}
+drawChefs();
+document.getElementById('chefs').onclick=e=>{const c=e.target.closest('.chef');if(!c)return;chef=c.dataset.id;try{localStorage.setItem('lab_chef',chef)}catch(e){}drawChefs()};
+const R=[['chef.html?r=etsote','🥩','Et sote','Şefle birlikte · 11 adım · ~1 saat · gerçek zamanlayıcı ve alarm',true],['cake.html','🎂','Çilekli vanilyalı kek','Sinematik prototip · 14 adım · film gibi izle ya da kendin yap']];
+document.getElementById('recipes').innerHTML=R.map(([u,e,n,d,nw])=>`<div class="card ${nw?'new':''}" data-u="${u}"><div class="e">${e}</div><div><b>${n}${nw?'<span class="tag">YENİ</span>':''}</b><small>${d}</small></div></div>`).join('');
+document.getElementById('recipes').onclick=e=>{const c=e.target.closest('.card');if(c)location.href=c.dataset.u+(c.dataset.u.includes('?')?'&':'?')+'chef='+chef};
+window.LAB={back:()=>false};
+</script>
 </body>
 </html>

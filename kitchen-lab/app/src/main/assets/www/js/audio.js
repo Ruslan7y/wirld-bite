@@ -90,6 +90,10 @@ export const sfx = {
   squelch() { if (!ctx) return; const n = noise(0.3, { type: 'lowpass', freq: 300, q: 4, gain: 0.35, attack: 0.05 }); n.f.frequency.exponentialRampToValueAtTime(900, now() + 0.25); },
   sift() { if (!ctx) return; noise(0.18, { type: 'highpass', freq: 5000, gain: 0.18, attack: 0.03 }); noise(0.08, { freq: 900, q: 2, gain: 0.1 }); },
   cut() { if (!ctx) return; noise(0.5, { type: 'lowpass', freq: 700, q: 2, gain: 0.25, attack: 0.15 }); },
+  chop() { if (!ctx) return; tone(140, 0.08, { type: 'triangle', gain: 0.4, slide: 70, rev: 0.1 }); noise(0.05, { freq: 1800, q: 1.5, gain: 0.35, rev: 0.1 }); },
+  pour() { if (!ctx) return; noise(0.4, { type: 'lowpass', freq: 600, q: 3, gain: 0.25, attack: 0.05 }); },
+  sizzleBurst() { if (!ctx) return; noise(1.2, { type: 'highpass', freq: 3000, q: 0.6, gain: 0.5, attack: 0.01 }); noise(0.8, { freq: 1200, q: 0.5, gain: 0.25 }); },
+  lid() { if (!ctx) return; [1200, 2600, 3900].forEach((f, i) => tone(f, 0.35, { gain: 0.08 / (i + 1), rev: 0.4 })); noise(0.04, { type: 'highpass', freq: 2500, gain: 0.25 }); },
   tick() { if (!ctx) return; noise(0.015, { freq: 4000, q: 8, gain: 0.18, rev: 0 }); },
 };
 
@@ -142,6 +146,39 @@ const BUILDERS = {
     const og = ctx.createGain(); og.gain.value = 0.15;
     o.connect(og).connect(out); n.connect(nf).connect(ng).connect(out); o.start(); n.start();
     return { set(v) { out.gain.setTargetAtTime(v * 0.2, now(), 0.3); } };
+  },
+  sizzle() {
+    const out = ctx.createGain(); out.gain.value = 0; out.connect(sfxBus);
+    const n = ctx.createBufferSource(); n.buffer = noiseBuf; n.loop = true;
+    const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 2500;
+    const f2 = ctx.createBiquadFilter(); f2.type = 'peaking'; f2.frequency.value = 6000; f2.gain.value = 6;
+    const am = ctx.createGain(); am.gain.value = 0.5;
+    n.connect(f).connect(f2).connect(am).connect(out); n.start();
+    // random crackle
+    const crack = setInterval(() => { if (out.gain.value > 0.01) { const t = now(); am.gain.setValueAtTime(0.5 + Math.random() * 0.9, t); am.gain.setTargetAtTime(0.45, t + 0.01, 0.03); } }, 45);
+    return { set(v) { out.gain.setTargetAtTime(v * 0.32, now(), 0.15); } };
+  },
+  boil() {
+    const out = ctx.createGain(); out.gain.value = 0; out.connect(sfxBus);
+    const n = ctx.createBufferSource(); n.buffer = noiseBuf; n.loop = true;
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 500; f.Q.value = 1;
+    n.connect(f).connect(out); n.start();
+    let lvl = 0;
+    setInterval(() => { if (lvl > 0.02 && Math.random() < 0.7) tone(200 + Math.random() * 500, 0.06, { gain: 0.06 * lvl, slide: 600 + Math.random() * 400, rev: 0.2 }); }, 70);
+    return { set(v) { lvl = v; out.gain.setTargetAtTime(v * 0.12, now(), 0.2); } };
+  },
+  alarm() {
+    const out = ctx.createGain(); out.gain.value = 0; out.connect(master);
+    const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = 1760;
+    const gate = ctx.createGain(); gate.gain.value = 0;
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 3500;
+    o.connect(f).connect(gate).connect(out); o.start();
+    let on = false;
+    setInterval(() => {
+      if (!on) return; const t = now();
+      for (let i = 0; i < 4; i++) { gate.gain.setValueAtTime(1, t + i * 0.12); gate.gain.setValueAtTime(0, t + i * 0.12 + 0.07); }
+    }, 1000);
+    return { set(v) { on = v > 0; out.gain.setTargetAtTime(v * 0.18, now(), 0.02); if (!on) gate.gain.setValueAtTime(0, now()); } };
   },
   steam() { return noiseLoop({ type: 'highpass', freq: 6000, q: 0.5, mod: 0.6, gain: 0.08 }); },
   room() { return noiseLoop({ type: 'lowpass', freq: 180, q: 0.5, mod: 0.2, gain: 0.12 }); },

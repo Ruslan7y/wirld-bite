@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>World Bite · Şefle pişir</title>
+<link rel="stylesheet" href="css/chef.css">
+<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js" } }</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="vignette"></div>
+<div id="pip" class="pip hide"><span id="pipName"></span></div>
+<div id="loading"><div class="ld-ring"></div><p>Mutfak hazırlanıyor…</p></div>
+
+<div id="top">
+  <button class="ic" id="bExit">✕</button>
+  <div class="stepbox"><div class="stepn" id="stepN"></div><div class="stept" id="stepT"></div><div class="prog"><i id="progBar"></i></div></div>
+  <button class="ic" id="bMic" title="Sesli komut">🎙️</button>
+  <button class="ic" id="bSound">🔊</button>
+</div>
+<div id="timers"></div>
+<div id="micHint" class="mic-hint hide">Dinliyorum… “sonraki”, “geri”, “tekrar” de</div>
+
+<div id="bottom">
+  <div id="sub" class="sub"><b id="subName"></b><span id="subText"></span><small id="subNote"></small></div>
+  <div class="ctrl">
+    <button id="bPrev" class="cb">⏮<small>Geri</small></button>
+    <button id="bRep" class="cb">↻<small>Tekrar</small></button>
+    <button id="bNext" class="cb main">⏭<small>Sonraki</small></button>
+  </div>
+</div>
+
+<div id="startOv" class="ov">
+  <div class="card">
+    <div class="kicker">ŞEFLE PİŞİR</div>
+    <h1 id="stTitle">Et sote</h1>
+    <p id="stInfo"></p>
+    <ul id="stIng" class="ing"></ul>
+    <button class="primary" id="bStart">Başlayalım 👩‍🍳</button>
+    <p class="note">Şef her adımı sesli anlatır. Sesli komut için 🎙️ düğmesine bas.</p>
+  </div>
+</div>
+
+<div id="alarm" class="ov alarm hide">
+  <div class="card">
+    <div class="bell">⏰</div>
+    <h1>Süre doldu!</h1>
+    <p id="alarmTxt"></p>
+    <button class="primary" id="bAlarmStop">Alarmı durdur</button>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script type="module" src="chef/app.js"></script>
+</body>
+</html>
