@@ -162,7 +162,7 @@ export function makeCarla(gltf, tex, getCamera) {
     if (ch.blink < 0) ch.blink = 2 + Math.random() * 3;
     for (const s of ['l', 'r']) { const e = B['eyelid_' + s]; if (e) e.rotateX(k * 0.45 * ch.lidSign); }
   };
-  ch.jawSign = 1; ch.lidSign = 1; ch.leanSign = 1; ch.palmSign = 1; ch.curlSign = 1;
+  ch.jawSign = 1; ch.lidSign = 1; ch.leanSign = 1; ch.palmSign = -1; ch.curlSign = 1;
 
   ch.wave = async () => {
     ch.mood = 'happy';
