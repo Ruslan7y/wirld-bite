@@ -7,17 +7,26 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const clamp = THREE.MathUtils.clamp;
 export const FLOOR = -0.895; // real floor in recipe space (counter top = 0)
 
-export function makeCarla(gltf, tex, getCamera) {
+export function makeCarla(gltf, tex, getCamera, opts = {}) {
   const root = new THREE.Group();
   const body = gltf.scene; body.position.y = FLOOR; root.add(body);
   let skinned = null; const B = {};
-  body.traverse(o => { if (o.isSkinnedMesh) skinned = o; if (o.isBone) B[o.name] = o; });
+  body.traverse(o => { if (o.isSkinnedMesh) skinned = o; if (o.isBone) B[o.name.includes('_walking_') ? o.name.split('_walking_')[1] : o.name] = o; });
+  // normalise size: head bone ≈ 1.62 m above the ankles, feet on the floor
+  root.updateMatrixWorld(true);
+  { const hy = B.head.getWorldPosition(V()).y, fy = B.foot_l.getWorldPosition(V()).y, h = hy - fy;
+    if (Math.abs(h - 1.55) > 0.2) body.scale.multiplyScalar((opts.height || 1.62) / h);
+    root.updateMatrixWorld(true);
+    body.position.y += FLOOR + 0.085 - B.foot_l.getWorldPosition(V()).y; root.updateMatrixWorld(true); }
+  const seated = !!opts.seated;
+  if (seated) { const hipY = B.hip.getWorldPosition(V()).y; body.position.y -= hipY - (FLOOR + (opts.seatH || 0.47) + 0.09); root.updateMatrixWorld(true); }
   skinned.material = new THREE.MeshStandardMaterial({ map: tex.dif, normalMap: tex.norm, roughness: 0.62 });
   skinned.castShadow = true; skinned.receiveShadow = true; skinned.frustumCulled = false;
   const rest = {}; for (const k in B) rest[k] = B[k].quaternion.clone();
 
   // ---- apron (follows the spine) ----
   body.updateMatrixWorld(true);
+  if (opts.apron !== false) {
   const apronMat = new THREE.MeshStandardMaterial({ color: 0xf3efe6, roughness: 0.85, side: THREE.DoubleSide });
   const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.225, 0.52, 32, 4, true, -1.1, 2.2), apronMat);
   skirt.scale.z = 0.85; skirt.position.set(0, 0.8, 0.03); skirt.castShadow = true;
@@ -28,6 +37,7 @@ export function makeCarla(gltf, tex, getCamera) {
   const tie = new THREE.Mesh(new THREE.TorusGeometry(0.168, 0.012, 6, 40), apronMat); tie.scale.z = 0.85; tie.rotation.x = Math.PI / 2; tie.scale.x = 1.17; tie.position.set(0, 1.05, 0.02);
   body.add(skirt, bib, ...straps, tie);
   B.spine_01.attach(skirt); B.spine_01.attach(tie); B.spine_03.attach(bib); straps.forEach(s => B.spine_03.attach(s));
+  }
 
   // grip points (palm centres) as plain objects in the scene
   const arms = {};
@@ -36,7 +46,7 @@ export function makeCarla(gltf, tex, getCamera) {
     arms[S] = { s, grip, target: V(), cur: V(), speed: 8, roll: 0, gripK: 0.25, gripT: 0.25, pose: null, fd: V(0, -1, 0), pn: V(0, -1, 0) };
   }
   const ch = {
-    id: 'carla', name: 'Carla', root, head: B.head, arms, speaking: false, mood: 'happy', t: 0,
+    id: opts.id || 'carla', name: opts.name || 'Carla', root, head: B.head, arms, speaking: false, mood: 'happy', t: 0,
     blink: 2, lookTarget: null, lookCam: false, gesture: null, _lean: 0, _yaw: 0,
   };
   const local = (x, y, z) => root.localToWorld(V(x, y, z));
@@ -95,7 +105,7 @@ export function makeCarla(gltf, tex, getCamera) {
     // follow targets
     for (const S of ['R', 'L']) {
       const a = arms[S];
-      const goal = a.free ? local(S === 'R' ? -0.2 : 0.2, -0.13, 0.1) : a.target;
+      const goal = a.free ? (seated ? local(S === 'R' ? -0.17 : 0.17, (opts.tableY ?? -0.1) + 0.03, 0.33) : local(S === 'R' ? -0.2 : 0.2, -0.13, 0.1)) : a.target;
       if (!a.init) { a.cur.copy(goal); a.init = true; }
       a.cur.lerp(goal, 1 - Math.exp(-a.speed * dt));
       a.gripK += (a.gripT - a.gripK) * Math.min(1, dt * 8);
@@ -103,13 +113,28 @@ export function makeCarla(gltf, tex, getCamera) {
     // lean + twist the spine toward the work so the hands can reach the counter
     const mid = V().addVectors(arms.R.cur, arms.L.cur).multiplyScalar(0.5);
     const rel = root.worldToLocal(mid.clone());
-    const busy = !(arms.R.free && arms.L.free);
+    const busy = !(arms.R.free && arms.L.free) && !seated;
     const leanT = busy ? clamp((rel.z - 0.05) * 0.9 + (0.35 - rel.y) * 0.35, 0, 0.42) : 0.02;
     const yawT = busy ? clamp(Math.atan2(rel.x, Math.max(0.15, rel.z)) * 0.55, -0.5, 0.5) : 0;
     ch._lean += (leanT - ch._lean) * Math.min(1, dt * 4); ch._yaw += (yawT - ch._yaw) * Math.min(1, dt * 4);
     B.spine_01.rotateX(ch._lean * 0.45 * ch.leanSign); B.spine_02.rotateX(ch._lean * 0.35 * ch.leanSign + Math.sin(time * 1.5) * 0.01);
     B.spine_01.rotateY(ch._yaw * 0.5); B.spine_02.rotateY(ch._yaw * 0.5);
     root.updateMatrixWorld(true);
+    if (seated) {
+      // sitting: thighs forward, shins down, slight lean toward the table
+      B.spine_02.rotateX(0.08 * ch.leanSign + (ch.eatLean || 0));
+      for (const s of ['l', 'r']) {
+        const ul = B['upperleg_' + s], ll = B['lowerleg_' + s], ft = B['foot_' + s];
+        const hip = ul.getWorldPosition(V());
+        const side = rgt.clone().multiplyScalar((s === 'l' ? 1 : -1) * 0.04);
+        const knee = hip.clone().addScaledVector(fwd, 0.44).add(V(0, -0.02, 0)).add(side);
+        aim(ul, ll, knee.clone().sub(hip));
+        const kp = ll.getWorldPosition(V());
+        aim(ll, ft, kp.clone().add(V(0, -0.42, 0)).addScaledVector(fwd, 0.06).add(side).sub(kp));
+        ft.rotateX(-0.25);
+      }
+      root.updateMatrixWorld(true);
+    }
     // arms: the target is the palm centre; aim the wrist slightly behind it
     for (const S of ['R', 'L']) {
       const a = arms[S], s = a.s;
@@ -157,7 +182,7 @@ export function makeCarla(gltf, tex, getCamera) {
     }
     if (ch.speaking) { head.rotateX(Math.sin(time * 6.1) * 0.02); head.rotateZ(Math.sin(time * 2.3) * 0.02); }
     // jaw (talking) + blink
-    const open = ch.speaking ? Math.max(0, Math.sin(time * 13) * Math.sin(time * 4.7 + 1)) * 0.16 + 0.02 : (ch.mood === 'wow' ? 0.12 : 0);
+    const open = ch.speaking ? Math.max(0, Math.sin(time * 13) * Math.sin(time * 4.7 + 1)) * 0.16 + 0.02 : ch.mood === 'chew' ? Math.max(0, Math.sin(time * 9)) * 0.07 : (ch.mood === 'wow' ? 0.12 : 0);
     ch._jaw = (ch._jaw || 0) + (open - (ch._jaw || 0)) * Math.min(1, dt * 20);
     B.jaw && B.jaw.rotateX(ch._jaw * ch.jawSign);
     ch.blink -= dt; let k = 0;

@@ -397,10 +397,32 @@ const etsote = {
           await c.station('table', 0.01);
           ch.reach('R', c.TABLE.spot.clone().add(V(0.12, 0.2, 0)), 30);
           await c.W(0.6);
-          await c.reachTo('R', c.TABLE.spot.clone().add(V(0.1, 0.05, 0)), 0.8);
+          const dest = (c.TABLE.guestPlate || c.TABLE.spot).clone().add(V(0, 0.003, 0));
+          await c.reachTo('R', dest.clone().add(V(0.2, 0.06, -0.25)), 0.8);
           c.release(plate); hl();
-          await c.moveTo(plate, c.TABLE.spot.clone().add(V(0, 0.003, 0)), 0.4, c.ease.out);
+          await c.moveTo(plate, dest, 0.5, c.ease.out);
           c.sfx.thunk(); ch.rest();
+          const G = c.guest;
+          if (G) {
+            await c.say('Buyur Ruslan, sıcak sıcak!');
+            // Ruslan eats: fork from the plate to his mouth, chews
+            const fork = c.fork(); fork.visible = true;
+            const fh = c.H(() => { const g = G.arms.R.grip.getWorldPosition(V()); fork.position.copy(g); fork.rotation.set(0, -Math.PI / 2 + 0.3, -0.5); fork.translateX(0.03); });
+            G.look(dest);
+            const fwd = V(1, 0, 0).applyAxisAngle(V(0, 1, 0), G.root.rotation.y - Math.PI / 2);
+            for (let b = 0; b < 2; b++) {
+              G.reach('R', dest.clone().add(V(0.02, 0.06, -0.03 * b)), 6); await c.W(0.9);
+              G.reach('R', dest.clone().add(V(0.02, 0.025, -0.03 * b)), 10); await c.W(0.35);
+              const mouth = G.head.getWorldPosition(V()).add(V(0, -0.1, 0)).addScaledVector(V(0, 0, 1).applyAxisAngle(V(0, 1, 0), G.root.rotation.y), 0.13);
+              G.reach('R', mouth, 5); await c.W(1.0);
+              G.mood = 'chew'; G.look(V(0, 0.5, 2)); await c.W(1.4); G.mood = 'happy'; G.look(dest);
+            }
+            G.reach('R', dest.clone().add(V(0.12, 0.05, -0.1)), 5);
+            G.look(V(0, 0.5, 2));
+            await c.say('Mmm, çok lezzetli olmuş Carla, ellerine sağlık! Ama unutmayın: yemek, ölmemek için yenir!', '', G);
+            ch.look(G.head.getWorldPosition(V()));
+            await c.W(0.3);
+          }
           ch.look(V(0, 0.5, 2));
         } else { c.shot('front', 1.2); ch.look(V(0, 0.5, 2)); }
         ch.cheer(); c.sfx.success(); c.vib(40);

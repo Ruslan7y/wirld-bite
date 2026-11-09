@@ -47,13 +47,14 @@ M.makeMaterials();
 const REAL = QS.get('chef') === 'carla';
 const K = buildKitchen(scene, { real: REAL });
 // realistic kitchen (user's model) placed so that its hob/counter match the recipe space
-let realGLTF = null, carlaGLTF = null, carlaTex = null, kitchenClip = null, TABLE = null;
+let realGLTF = null, carlaGLTF = null, carlaTex = null, kitchenClip = null, TABLE = null, ruslanGLTF = null, ruslanTex = null;
 if (REAL) {
   const gl = new GLTFLoader(); gl.setMeshoptDecoder(MeshoptDecoder);
   const tl = new THREE.TextureLoader();
   const load = u => new Promise((res, rej) => gl.load(u, res, undefined, rej));
   const ltex = (u, srgb) => new Promise(res => tl.load(u, t => { t.flipY = false; if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; res(t); }));
-  const [kit, carla, dif, norm, tab] = await Promise.all([load('models/kitchen.glb'), load('models/carla.glb'), ltex('models/carla_dif.jpg', true), ltex('models/carla_norm.jpg'), load('models/table.glb')]);
+  const [kit, carla, dif, norm, tab, rus, rdif, rnorm] = await Promise.all([load('models/kitchen.glb'), load('models/carla.glb'), ltex('models/carla_dif.jpg', true), ltex('models/carla_norm.jpg'), load('models/table.glb'), load('models/ruslan.glb'), ltex('models/ruslan_dif.jpg', true), ltex('models/ruslan_norm.jpg')]);
+  ruslanGLTF = rus; ruslanTex = { dif: rdif, norm: rnorm };
   const g = new THREE.Group(); g.rotation.y = -Math.PI / 2; g.position.set(1.69, -0.895, -1.28);
   kit.scene.scale.setScalar(0.1); g.add(kit.scene); scene.add(g);
   // dining table (user's model) in the open part of the room, for serving
@@ -66,7 +67,15 @@ if (REAL) {
     rc.set(new THREE.Vector3(tc.x + dx, 2, tc.z + dz), new THREE.Vector3(0, -1, 0));
     const h = rc.intersectObject(tab.scene, true)[0]; if (h && h.point.y > -0.3) { spot = h.point.clone(); break; }
   }
-  TABLE = { spot: spot || new THREE.Vector3(tc.x, tb.max.y, tc.z) };
+  TABLE = { spot: spot || new THREE.Vector3(tc.x, tb.max.y, tc.z), obj: tab.scene };
+  { // table edge toward -x: the guest sits there
+    const sp = TABLE.spot; let edge = 0;
+    for (let d = 0; d < 1.4; d += 0.03) { rc.set(new THREE.Vector3(sp.x - d, 2, sp.z), new THREE.Vector3(0, -1, 0)); const h = rc.intersectObject(tab.scene, true)[0]; if (!h || Math.abs(h.point.y - sp.y) > 0.03) break; edge = d; }
+    // dining part of the table lies toward +z of the spot (0.9 m wide); guest sits on its +x side facing -x
+    TABLE.seat = new THREE.Vector3(sp.x + 0.56, 0, sp.z + 1.0);
+    TABLE.guestPlate = new THREE.Vector3(sp.x + 0.0, sp.y, sp.z + 1.0);
+    TABLE.carla = new THREE.Vector3(sp.x + 0.5, 0, sp.z + 0.42);
+  }
   const pend = new THREE.PointLight(0xffe3b8, 1.6, 3, 1.4); pend.position.copy(TABLE.spot).add(new THREE.Vector3(0, 0.9, 0)); scene.add(pend);
   // face-on shots: cut away wall cabinets + hood between the camera and the chef
   kitchenClip = [new THREE.Plane(new THREE.Vector3(0, -1, 0), 0.52), new THREE.Plane(new THREE.Vector3(0, 0, -1), -0.25)];
@@ -84,10 +93,27 @@ if (REAL) {
 // ---------------- chef ----------------
 const chefId = REAL ? 'carla' : ['leyla', 'zeynep', 'aylin'].includes(QS.get('chef')) ? QS.get('chef') : 'zeynep';
 const ch = REAL ? makeCarla(carlaGLTF, carlaTex, () => camera) : makeCharacter(chefId);
-const STATION = REAL ? { stove: { p: V(0.2, 0, -0.5), r: 0 }, board: { p: V(0.02, 0, -0.43), r: -Math.PI / 2 }, table: { p: TABLE.spot.clone().setY(0).add(V(0.42, 0, 0)), r: -Math.PI / 2 } } : { stove: { p: V(0, 0, -0.56), r: 0 }, board: { p: V(0, 0, -0.56), r: 0 } };
+const STATION = REAL ? { stove: { p: V(0.2, 0, -0.5), r: 0 }, board: { p: V(0.02, 0, -0.43), r: -Math.PI / 2 }, table: { p: TABLE.carla.clone(), r: -0.7 } } : { stove: { p: V(0, 0, -0.56), r: 0 }, board: { p: V(0, 0, -0.56), r: 0 } };
 ch.root.position.copy(STATION.stove.p);
 scene.add(ch.root);
 const CHEF = REAL ? { name: 'Carla', voice: { pitch: 1.05, rate: 0.97 } } : CHEF_INFO[chefId];
+// guest at the dining table (Ruslan), sitting on a chair
+let guest = null, chair = null;
+if (REAL && ruslanGLTF) {
+  guest = makeCarla(ruslanGLTF, ruslanTex, () => camera, { id: 'ruslan', name: 'Ruslan', apron: false, seated: true, height: 1.64, tableY: TABLE.spot.y });
+  guest.voice = { pitch: 0.82, rate: 0.95 }; guest.lidSign = 0;
+  const faceFill = new THREE.PointLight(0xfff0e0, 1.3, 3, 1.3);
+  faceFill.position.set(TABLE.spot.x - 0.8, TABLE.spot.y + 0.75, TABLE.spot.z + 1.1); scene.add(faceFill);
+  guest.root.position.copy(TABLE.seat); guest.root.rotation.y = -Math.PI / 2; scene.add(guest.root);
+  // simple modern chair
+  chair = new THREE.Group(); const wood = M.MAT.wood, metal = new THREE.MeshStandardMaterial({ color: 0x2b2b2b, metalness: 0.7, roughness: 0.35 });
+  const SEAT = -0.895 + 0.45;
+  const seatM = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.03, 0.44), wood); seatM.position.y = SEAT; chair.add(seatM);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.4, 0.42), wood); back.position.set(-0.21, SEAT + 0.24, 0); back.rotation.z = -0.08; chair.add(back);
+  for (const [x, z] of [[-0.19, -0.19], [0.19, -0.19], [-0.19, 0.19], [0.19, 0.19]]) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.45, 8), metal); l.position.set(x, SEAT - 0.225, z); chair.add(l); }
+  chair.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; } });
+  chair.position.set(TABLE.seat.x + 0.06, 0, TABLE.seat.z); chair.rotation.y = Math.PI; scene.add(chair);
+}
 
 // ---------------- props for the recipe ----------------
 const R = RECIPES[QS.get('r') || 'etsote'];
@@ -153,7 +179,9 @@ function resetScene() {
   pan.userData.oil.material.opacity = 0; pan.userData.setLiquid(0, 0xc0502a, 0); panLevel = 0;
   oilStream.hide(); waterStream.hide();
   ['sizzle', 'boil', 'steam'].forEach(l => setLoop(l, 0));
-  ch.root.rotation.y = STATION.stove.r; ch.root.position.copy(STATION.stove.p); ch.rest(100); ch.look(null); ch.mood = 'happy'; ch.arms.R.roll = ch.arms.L.roll = 0;
+  ch.root.rotation.y = STATION.stove.r; ch.root.position.copy(STATION.stove.p); ch.rest(100);
+  if (guest) { guest.rest(100); guest.look(null); guest.mood = 'happy'; guest.speaking = false; }
+  if (FORK) FORK.visible = false; ch.look(null); ch.mood = 'happy'; ch.arms.R.roll = ch.arms.L.roll = 0;
   ST.stir = 0; ST.heat = 0; ST.boil = 0; ST.steam = 0;
 }
 const ST = { stir: 0, heat: 0, boil: 0, steam: 0, stirA: 0 };
@@ -179,7 +207,7 @@ if (REAL) Object.assign(SHOT, {
   plate: { p: [-0.75, 0.62, -0.4], t: [-0.3, 0.03, -0.45], h: 52 },
   wide: { p: [-1.45, 0.76, -2.2], t: [0.35, 0.1, -0.3], h: 52 },
   serve: { p: [0.2, 0.78, 0.3], t: [0.08, 0.02, -0.16], h: 62 },
-  table: TABLE ? { p: TABLE.spot.toArray().map((v, i) => v + [-0.95, 0.62, 0.55][i]), t: TABLE.spot.toArray().map((v, i) => v + [0.2, 0.28, -0.05][i]), h: 58 } : { p: [0, 0.5, 1], t: [0, 0, 0], h: 50 },
+  table: TABLE ? { p: [TABLE.spot.x - 1.05, TABLE.spot.y + 0.62, TABLE.spot.z + 1.45], t: [TABLE.seat.x - 0.12, TABLE.spot.y + 0.3, TABLE.seat.z - 0.2], h: 60 } : { p: [0, 0.5, 1], t: [0, 0, 0], h: 50 },
 });
 let view = 'front', shotAge = 0;
 function shot(name, dur = 1.2) {
@@ -235,6 +263,7 @@ async function station(name, d = 1.0) {
 // attach a prop to a hand grip with a local offset
 // a held prop keeps its own (world) orientation and follows the hand; gp = grip point in the prop's model space
 const FOLLOW = new Map();
+let FORK = null;
 function hold(o, side, gp = [0, 0, 0], rot = [0, 0, 0]) {
   scene.attach(o); o.rotation.set(...rot);
   FOLLOW.set(o, { side, gp: V(...gp) }); ch.setGrip && ch.setGrip(side, 0.95);
@@ -264,20 +293,20 @@ function fill(s) {
   return s.replace(/\{hey\}/g, hey).replace(/\{name\}/g, CHEF.name);
 }
 function caption(text, note = '') { $('subName').textContent = CHEF.name; $('subText').textContent = text; $('subNote').textContent = note; }
-function say(raw, note = '') {
-  const text = fill(raw); const g = GEN;
-  caption(text, note);
+function say(raw, note = '', who = null) {
+  const text = fill(raw); const g = GEN; const sp = who || ch, voice = who ? who.voice : CHEF.voice;
+  caption(text, note); if (who) $('subName').textContent = who.name;
   const id = ++speakSeq;
-  ch.speaking = true;
+  sp.speaking = true;
   return new Promise((res, rej) => {
     let finished = false;
-    const done = () => { if (finished) return; finished = true; ch.speaking = false; if (g !== GEN) rej(ABORT); else setTimeout(res, 250); };
+    const done = () => { if (finished) return; finished = true; sp.speaking = false; if (g !== GEN) rej(ABORT); else setTimeout(res, 250); };
     speakDone = done;
     const est = 900 + text.length * 62;
-    if (!audio.muted && A && A.speak) { try { A.speak(text, CHEF.voice.pitch, CHEF.voice.rate, String(id)); setTimeout(done, est * 2.2 + 3000); return; } catch (e) { } }
+    if (!audio.muted && A && A.speak) { try { A.speak(text, voice.pitch, voice.rate, String(id)); setTimeout(done, est * 2.2 + 3000); return; } catch (e) { } }
     if (!audio.muted && window.speechSynthesis && !AUTO) {
       try {
-        const u = new SpeechSynthesisUtterance(text); u.lang = 'tr-TR'; u.pitch = CHEF.voice.pitch; u.rate = CHEF.voice.rate;
+        const u = new SpeechSynthesisUtterance(text); u.lang = 'tr-TR'; u.pitch = voice.pitch; u.rate = voice.rate;
         const v = speechSynthesis.getVoices().find(v => /tr/i.test(v.lang)); if (v) u.voice = v;
         u.onend = done; u.onerror = done; speechSynthesis.cancel(); speechSynthesis.speak(u);
         setTimeout(done, est * 2 + 2000); return;
@@ -384,7 +413,7 @@ let cur = -1;
 const stepState = { waitingTimer: false };
 function ctx(i) {
   return {
-    i, say, W, T, H, shot, moveTo, both, hold, drop, grab, isHeld, release: o => { const f = FOLLOW.get(o); if (f && ch.setGrip) ch.setGrip(f.side, 0.25); FOLLOW.delete(o); }, TABLE, reachTo, wp, ch, K, P, pan, lid, plate, spoon, oil, paste, salt, black, water, onion, pepper, tomato, garlic, parsley,
+    i, say, W, T, H, shot, guest, scene, fork: () => FORK || (FORK = (() => { const f = M.makeFork(); scene.add(f); return f; })()), moveTo, both, hold, drop, grab, isHeld, release: o => { const f = FOLLOW.get(o); if (f && ch.setGrip) ch.setGrip(f.side, 0.25); FOLLOW.delete(o); }, TABLE, reachTo, wp, ch, K, P, pan, lid, plate, spoon, oil, paste, salt, black, water, onion, pepper, tomato, garlic, parsley,
     ST, sfx, setLoop, vib, REAL, station, boardHome: () => HOME.get(K.board), startTimer: (min, label) => startTimer(i, min, label), timerFrac, stepState, oilStream, waterStream,
     saltP, pepP, steamP, spitP, setPanLevel: v => panLevel = v, F, M, V, rand, ease, lerp, clamp, chefId,
     waitTimer: async (t, onP, lines = []) => {
@@ -467,6 +496,7 @@ function frame() {
   hooks.forEach(h => h(dt, time));
   cookFrame(dt, time);
   ch.update(dt, time);
+  if (guest) guest.update(dt, time);
   followFrame();
   P_sync();
   allP.forEach(p => p.update(dt));
@@ -490,7 +520,7 @@ window.LAB = {
   back() { if (alarmOn) { stopAlarm(); return true; } stopSpeech(); location.href = 'index.html'; return true; },
   pause() { stopSpeech(); ['sizzle', 'boil', 'steam'].forEach(l => setLoop(l, 0)); },
   state: () => ({ step: cur, view, timers: timers.map(t => [t.label, Math.round((t.end - now()) / 1000), t.fired]) }),
-  go, next, shot: setShot, ch, V, cam: (p, t, h) => { SHOT.dbg = { p, t, h }; setShot('dbg'); },
+  go, next, shot: setShot, ch, V, TABLE: () => TABLE, cam: (p, t, h) => { SHOT.dbg = { p, t, h }; setShot('dbg'); },
 };
 
 // ---------------- start ----------------
