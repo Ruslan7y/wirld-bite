@@ -6,11 +6,11 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const BOARD_AT = [-0.05, 0, -0.1];
 
 // ---------- reusable actions ----------
-async function turn(c, a, d = 0.6) { const a0 = c.ch.root.rotation.y; await c.T(d, k => c.ch.root.rotation.y = c.lerp(a0, a, k), c.ease.inOut); }
+export async function turn(c, a, d = 0.6) { const a0 = c.ch.root.rotation.y; await c.T(d, k => c.ch.root.rotation.y = c.lerp(a0, a, k), c.ease.inOut); }
 const KNIFE = [[-0.05, 0.02, 0], [0, -Math.PI / 2 + 0.95, 0.1]];
 const SPOON = [[0, 0, -0.15], [Math.PI / 2 - 0.35, 0.3, 0]];
 
-async function chop(c, whole, type, dur, line) {
+export async function chop(c, whole, type, dur, line) {
   const { ch, K, P } = c;
   const b = K.board;
   if (line) c.say(line).catch(() => { });
@@ -61,10 +61,10 @@ async function chop(c, whole, type, dur, line) {
   }
   whole.visible = false;
 }
-function chopApply(c, whole, type) { whole.visible = false; c.P[type].board.count = c.P[type].board.max; }
+export function chopApply(c, whole, type) { whole.visible = false; c.P[type].board.count = c.P[type].board.max; }
 
 // pieces fly from one set to another (world-space arcs)
-async function fly(c, src, dst, n, dur = 0.9, spread = 0.5) {
+export async function fly(c, src, dst, n, dur = 0.9, spread = 0.5) {
   n = Math.min(n, src.count); if (!n) return;
   const type = src.type, fl = c.P[type].fly;
   const sp = src.mesh.parent, dp = dst.mesh.parent; sp.updateMatrixWorld(); dp.updateMatrixWorld();
@@ -84,7 +84,7 @@ async function fly(c, src, dst, n, dur = 0.9, spread = 0.5) {
 }
 
 // lift the board over the pan, tip the chopped pieces in, bring it back
-async function boardToPan(c, types, line) {
+export async function boardToPan(c, types, line) {
   const { K, ch, pan } = c, b = K.board;
   if (line) c.say(line).catch(() => { });
   if (c.isHeld(c.K.knife)) c.drop(c.K.knife);
@@ -102,10 +102,10 @@ async function boardToPan(c, types, line) {
   if (c.REAL) { h(); ch.rest(); await c.both(c.moveTo(b, home.p.clone(), 0.9, c.ease.inOut, 0.05), c.T(0.9, k => b.rotation.y = c.lerp(0, home.r.y, k)), turn(c, 0, 0.8)); }
   else { await c.both(turn(c, 0, 0.8), c.moveTo(b, home.p.clone(), 0.9, c.ease.inOut, 0.05)); h(); ch.rest(); }
 }
-function boardToPanApply(c, types) { for (const t of types) { const P = c.P[t]; P.pan.count = P.board.count || P.board.max; P.board.count = 0; } }
+export function boardToPanApply(c, types) { for (const t of types) { const P = c.P[t]; P.pan.count = P.board.count || P.board.max; P.board.count = 0; } }
 
 // stir loop: right hand with the wooden spoon circles in the pan
-function startStir(c, amp = 1) {
+export function startStir(c, amp = 1) {
   const { ch, pan, spoon } = c;
   if (!c.isHeld(spoon)) c.hold(spoon, 'R', ...SPOON);
   if (ch.handPose) {
@@ -123,9 +123,9 @@ function startStir(c, amp = 1) {
     c.ST.stir = amp;
   });
 }
-function stopStir(c, stopH) { stopH(); c.ST.stir = 0; c.drop(c.spoon); c.ch.rest(); }
+export function stopStir(c, stopH) { stopH(); c.ST.stir = 0; c.drop(c.spoon); c.ch.rest(); }
 
-async function pinch(c, bowl, P, n = 60) {
+export async function pinch(c, bowl, P, n = 60) {
   const { ch, pan } = c;
   await c.reachTo('R', bowl.getWorldPosition(V()).add(V(0, 0.04, 0)), 0.5);
   const over = pan.localToWorld(V(-0.02, 0.2, 0.02));
@@ -209,7 +209,7 @@ const etsote = {
     },
     {
       title: 'Etleri sotele',
-      apply(c) { c.P.meat.bowl.count = 0; c.P.meat.pan.count = c.P.meat.pan.max; c.P.meat.pan.done = 0.85; },
+      apply(c) { c.P.meat.stage.count = 0; c.P.meat.pan.count = c.P.meat.pan.max; c.P.meat.pan.done = 0.85; },
       async play(c) {
         const { ch, K, pan, P } = c;
         c.shot('stove', 0.9); ch.look(pan.getWorldPosition(V()));
@@ -220,7 +220,7 @@ const etsote = {
         c.shot('pan', 0.7);
         await c.T(0.5, k => K.meatBowl.rotation.z = -k * 1.5);
         c.sfx.sizzleBurst(); c.vib(30); c.ST.heat = 1;
-        await fly(c, P.meat.bowl, P.meat.pan, P.meat.bowl.count, 0.55, 0.8);
+        await fly(c, P.meat.stage, P.meat.pan, P.meat.stage.count, 0.55, 0.8);
         await c.T(0.4, k => K.meatBowl.rotation.z = -(1 - k) * 1.5);
         c.drop(K.meatBowl); ch.rest();
         const t = c.startTimer(10, 'Etler soteleniyor');

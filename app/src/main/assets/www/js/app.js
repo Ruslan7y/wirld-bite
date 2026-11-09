@@ -191,6 +191,7 @@ function pushPage(html, mount, cls) {
   return el;
 }
 function back() {
+  { const w = labWin(); if (w) { try { if (w.LAB && w.LAB.back) { w.LAB.back(); return true; } } catch (e) { } closeLab(); return true; } }
   if (sheetOpen()) { closeSheet(); return true; }
   if (stack.length) { const el = stack.pop(); if (el._onClose) el._onClose(); el.classList.add('out'); setTimeout(() => el.remove(), 240); return true; }
   if ($('#main').classList.contains('show') && state.tab !== 'explore') { setTab('explore'); return true; }
@@ -354,7 +355,7 @@ const TABS = ['explore', 'travel', 'pantry', 'list', 'settings'];
 function enterApp() {
   $('#tabbar').innerHTML = TABS.map(k => `<button data-tab="${k}">${I[k]}<span>${t('tab' + k[0].toUpperCase() + k.slice(1))}</span></button>`).join('');
   $$('#tabbar button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
-  show('main');
+  show('main'); setTimeout(offerLabResume, 1200);
   renderExplore(); renderTravel(); renderPantry(); renderList(); renderSettings();
   setTab(state.tab);
   if (!store.get('ageSkipped', false)) setTimeout(() => askAge(), 3800);
@@ -619,11 +620,42 @@ function dietHTML(d) {
 }
 function openKitchen(rc, name, extra) {
   extra = extra || {};
-  const w = extra.wiki ? wikiCached(extra.wiki, 'en') : null;
-  const local = extra.key && typeof LOCAL_PHOTOS !== 'undefined' && LOCAL_PHOTOS[extra.key];
-  const chefId = currentChef(extra.code), ch = CHEFS[chefId];
-  Kitchen.open({ code: extra.code || '', key: rc.key || name, chef: { id: chefId, name: ch.name[lang] || ch.name.tr }, name, country: extra.country || '', emoji: extra.emoji || '🍽️', img: local || (w && (w.big || w.img)) || null, ing: rc.ing.map(l => scaleLine(l, (rc.cur || rc.s) / rc.s)), st: rc.st, servings: rc.cur || rc.s, time: fmtTime(rc.t), nutri: rc.n || estimateNutrition(rc.ing, rc.s, rc.key) },
-    { t, esc, lang, pushPage, back, keepAwake, openSheet, toast, saveScore, onCooked, voiceAuto: store.get('voiceAuto', false) });
+  // the 3D cooking scene (lab/chef.html) reads this recipe and plays every step
+  window.WB_LAB_RECIPE = { name, ing: rc.ing.map(l => scaleLine(l, (rc.cur || rc.s) / rc.s)), st: rc.st.slice(), s: rc.cur || rc.s, time: rc.t, key: rc.key || name, code: extra.code || '', country: extra.country || '' };
+  let chef = 'carla'; try { chef = localStorage.getItem('labChef') || 'carla'; } catch (e) { }
+  openLab(`lab/chef.html?wb=1&chef=${chef}`);
+}
+/* ---------- 3D cooking scene overlay ---------- */
+let labFrame = null;
+function openLab(url) {
+  if (!labFrame) {
+    labFrame = document.createElement('iframe'); labFrame.id = 'labFrame'; labFrame.setAttribute('allow', 'autoplay; microphone');
+    labFrame.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:0;z-index:9999;background:#140f0c;display:none';
+    document.body.appendChild(labFrame);
+  }
+  labFrame.src = url; labFrame.style.display = 'block'; keepAwake(true);
+}
+function closeLab() { if (!labFrame) return; labFrame.style.display = 'none'; labFrame.src = 'about:blank'; keepAwake(false); try { Android && Android.stopSpeak && Android.stopSpeak(); } catch (e) { } }
+const labWin = () => labFrame && labFrame.style.display !== 'none' ? labFrame.contentWindow : null;
+window.WB_LAB_CLOSE = closeLab; window.__labWin = labWin;
+// native callbacks arrive in this (top) window: pass them to the scene
+window.LAB_TTS_DONE = id => { const w = labWin(); w && w.LAB_TTS_DONE && w.LAB_TTS_DONE(id); };
+window.LAB_ALARM_FIRED = id => { const w = labWin(); w && w.LAB_ALARM_FIRED && w.LAB_ALARM_FIRED(id); };
+window.LAB_PAUSE = () => { const w = labWin(); w && w.LAB && w.LAB.pause && w.LAB.pause(); };
+function labResumeInfo() {
+  try {
+    const p = JSON.parse(localStorage.getItem('lab_progress') || 'null'), r = JSON.parse(localStorage.getItem('lab_wb_recipe') || 'null');
+    if (p && r && p.r === 'wb-' + (r.key || r.name) && p.step > 0 && Date.now() - p.at < 6 * 3600e3) return { p, r };
+  } catch (e) { }
+  return null;
+}
+function offerLabResume() {
+  const info = labResumeInfo(); if (!info) return;
+  const bar = document.createElement('div');
+  bar.style.cssText = 'position:fixed;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 84px);z-index:900;background:var(--p,#ff7a45);color:#fff;border-radius:16px;padding:12px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,.25);font:600 14px system-ui';
+  bar.innerHTML = `<span style="font-size:22px">👩‍🍳</span><span style="flex:1">${esc(info.r.name)} · ${lang === 'en' ? 'continue where you left off' : lang === 'ru' ? 'продолжить с места остановки' : lang === 'az' ? 'qaldığın yerdən davam et' : 'kaldığın yerden devam et'}</span><b style="font-size:18px">▶</b><span data-x style="opacity:.8;padding:0 4px">✕</span>`;
+  bar.onclick = e => { bar.remove(); if (e.target.dataset.x !== undefined) return; window.WB_LAB_RECIPE = info.r; openLab(`lab/chef.html?wb=1&chef=${info.p.chef}&resume=1`); };
+  document.body.appendChild(bar); setTimeout(() => bar.remove(), 20000);
 }
 function bindRecipe(el, rc, name, extra) {
   const upd = () => { const all = $$('.ing li,.steps li', el), d = all.filter(x => x.classList.contains('done')); $$('.rProg', el).forEach(p => p.style.width = (d.length / all.length * 100) + '%'); };
@@ -1529,7 +1561,7 @@ function renderSettings() {
       <button class="row" id="sIntro"><span class="ri">${I.replay}</span><span class="lbl">${t('replayIntro')}</span>${I.chev}</button>
       <button class="row" id="sCache"><span class="ri">${I.trash}</span><span class="lbl">${t('clearCache')}</span>${I.chev}</button>
       <button class="row danger" id="sOut"><span class="ri">${I.logout}</span><span class="lbl">${t('logout')}</span></button></div>
-    <div class="group"><h4>${t('about2')}</h4><div class="row"><span class="ri">${I.info}</span><span class="lbl">World Bite</span><small>${t('version')} 1.6.0</small></div><p class="credits">${t('credits')}</p></div>`;
+    <div class="group"><h4>${t('about2')}</h4><div class="row"><span class="ri">${I.info}</span><span class="lbl">World Bite</span><small>${t('version')} 1.7.0</small></div><p class="credits">${t('credits')}</p></div>`;
   $$('[data-chef]').forEach(b => b.onclick = () => { store.set('chefMode', b.dataset.chef); renderSettings(); });
   $$('[data-cm]').forEach(b => b.onclick = () => { store.set('chefMode', b.dataset.cm); renderSettings(); });
   $('#sAge').onclick = () => askAge(true);

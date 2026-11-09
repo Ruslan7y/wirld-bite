@@ -24,6 +24,30 @@ export const PIECE = {
     colors: [[0, 0xd8322a], [1, 0xa8261c]], sauce: 0x9a2a18 },
   parsley: { geo: () => new THREE.PlaneGeometry(0.008, 0.006), mat: () => new THREE.MeshStandardMaterial({ color: 0x3f9a34, roughness: 0.5, side: THREE.DoubleSide }),
     colors: [[0, 0x3f9a34]], sauce: 0x3f9a34 },
+  // ---- generic types for any recipe ----
+  mince: { geo: () => new THREE.IcosahedronGeometry(0.007, 0), mat: () => phys(0xc04a50, { roughness: 0.6, bumpMap: meatTex, bumpScale: 1 }), colors: [[0, 0xc04a50], [1, 0x6e4126]], sauce: 0x6b2814 },
+  chicken: { geo: () => new RoundedBoxGeometry(0.026, 0.02, 0.024, 2, 0.006), mat: () => phys(0xf0c2b0, { roughness: 0.45, bumpMap: meatTex, bumpScale: 1 }), colors: [[0, 0xf0c2b0], [0.6, 0xe8c69a], [1, 0xc98f4e]], sauce: 0xb5552c },
+  fish: { geo: () => new RoundedBoxGeometry(0.03, 0.014, 0.022, 2, 0.005), mat: () => phys(0xf3e3da, { roughness: 0.35 }), colors: [[0, 0xf3e3da], [1, 0xd8a76a]], sauce: 0xc0703a },
+  shrimp: { geo: () => new THREE.TorusGeometry(0.009, 0.005, 6, 12, 4.2), mat: () => phys(0xd9c7c0, { roughness: 0.3, clearcoat: 0.6 }), colors: [[0, 0xd9c7c0], [1, 0xf08a5e]], sauce: 0xd06a3a },
+  potato: { geo: () => new RoundedBoxGeometry(0.018, 0.018, 0.018, 2, 0.004), mat: () => phys(0xf1dfa6, { roughness: 0.5 }), colors: [[0, 0xf1dfa6], [1, 0xd9a24e]], sauce: 0xc0703a },
+  carrot: { geo: () => new THREE.CylinderGeometry(0.009, 0.009, 0.005, 14), mat: () => phys(0xf07a22, { roughness: 0.35, clearcoat: 0.4 }), colors: [[0, 0xf07a22], [1, 0xd8661a]], sauce: 0xc0501a },
+  eggplant: { geo: () => new RoundedBoxGeometry(0.018, 0.016, 0.018, 2, 0.004), mat: () => phys(0xe6dcb8, { roughness: 0.5 }), colors: [[0, 0xe6dcb8], [1, 0xa87a4a]], sauce: 0x8a3a20 },
+  zucchini: { geo: () => new THREE.CylinderGeometry(0.012, 0.012, 0.005, 16), mat: () => phys(0xcfe6a2, { roughness: 0.4 }), colors: [[0, 0xcfe6a2], [1, 0xb8b06a]], sauce: 0x9a6a30 },
+  mushroom: { geo: () => new THREE.SphereGeometry(0.01, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), mat: () => phys(0xd8c3a2, { roughness: 0.6 }), colors: [[0, 0xd8c3a2], [1, 0x8a6440]], sauce: 0x6a3a20 },
+  greens: { geo: () => new THREE.PlaneGeometry(0.018, 0.012), mat: () => new THREE.MeshStandardMaterial({ color: 0x4f9a3a, roughness: 0.5, side: THREE.DoubleSide }), colors: [[0, 0x4f9a3a], [1, 0x3f6a2a]], sauce: 0x4a5a22 },
+  cucumber: { geo: () => new THREE.CylinderGeometry(0.011, 0.011, 0.004, 16), mat: () => phys(0xd6ebb0, { roughness: 0.3 }), colors: [[0, 0xd6ebb0]], sauce: 0xd6ebb0 },
+  corn: { geo: () => new THREE.SphereGeometry(0.004, 6, 4), mat: () => phys(0xf2c430, { roughness: 0.3 }), colors: [[0, 0xf2c430], [1, 0xe0a828]], sauce: 0xd09020 },
+  legume: { geo: () => new THREE.SphereGeometry(0.0055, 8, 6), mat: () => phys(0xd9b98a, { roughness: 0.5 }), colors: [[0, 0xd9b98a], [1, 0xb8925e]], sauce: 0x9a4a24 },
+  rice: { geo: () => new THREE.CapsuleGeometry(0.0016, 0.004, 2, 6), mat: () => phys(0xf5f1e6, { roughness: 0.5 }), colors: [[0, 0xf2ead2], [1, 0xfbf8f0]], sauce: 0xd9a060 },
+  pasta: { geo: () => new THREE.CylinderGeometry(0.004, 0.004, 0.022, 8, 1, true), mat: () => phys(0xf0d58a, { roughness: 0.4, side: THREE.DoubleSide }), colors: [[0, 0xf0d58a], [1, 0xf4e2a8]], sauce: 0xc0502a },
+  cheese: { geo: () => new RoundedBoxGeometry(0.014, 0.012, 0.014, 2, 0.003), mat: () => phys(0xfbf6ea, { roughness: 0.6 }), colors: [[0, 0xfbf6ea], [1, 0xf3d79a]], sauce: 0xf0c070 },
+  egg: { geo: () => new THREE.IcosahedronGeometry(0.009, 1), mat: () => phys(0xfbe27a, { roughness: 0.5 }), colors: [[0, 0xfbe9a0], [1, 0xf6d24e]], sauce: 0xe0a040 },
+  lemon: { geo: () => new THREE.CylinderGeometry(0.014, 0.014, 0.004, 18), mat: () => phys(0xf6e05a, { roughness: 0.3, clearcoat: 0.5 }), colors: [[0, 0xf6e05a]], sauce: 0xf6e05a },
+  fruit: { geo: () => new RoundedBoxGeometry(0.016, 0.014, 0.016, 2, 0.004), mat: () => phys(0xe2504a, { roughness: 0.3, clearcoat: 0.6 }), colors: [[0, 0xe2504a], [1, 0xb8402a]], sauce: 0xa8301a },
+  nuts: { geo: () => new THREE.IcosahedronGeometry(0.006, 0), mat: () => phys(0xa8763e, { roughness: 0.6 }), colors: [[0, 0xa8763e], [1, 0x7a4e24]], sauce: 0x7a4e24 },
+  bread: { geo: () => new RoundedBoxGeometry(0.022, 0.016, 0.022, 2, 0.005), mat: () => phys(0xe9c98a, { roughness: 0.7 }), colors: [[0, 0xe9c98a], [1, 0xc58a3e]], sauce: 0xb06a30 },
+  veg: { geo: () => new RoundedBoxGeometry(0.016, 0.012, 0.016, 2, 0.004), mat: () => phys(0x6fae4a, { roughness: 0.35 }), colors: [[0, 0x6fae4a], [1, 0x5a8a3a]], sauce: 0x7a6a2a },
+  dough: { geo: () => new THREE.SphereGeometry(0.016, 12, 8), mat: () => phys(0xf2e2bd, { roughness: 0.7 }), colors: [[0, 0xf2e2bd], [1, 0xd9a35a]], sauce: 0xd9a35a },
 };
 const cA = new THREE.Color(), cB = new THREE.Color();
 function doneColor(type, done, sauce, out) {
@@ -181,4 +205,24 @@ export function makeLid() {
 export function servingPlate() {
   const pts = [V2(0, 0), V2(0.07, 0), V2(0.075, 0.004), V2(0.1, 0.006), V2(0.15, 0.022), V2(0.153, 0.025), V2(0.148, 0.025), V2(0.1, 0.011), V2(0, 0.009)];
   return mesh(new THREE.LatheGeometry(pts, 64), MAT.ceramic);
+}
+
+// generic whole item for the board (colour + rough shape by type)
+const WHOLE = {
+  potato: [0xc89a5c, 'egg'], carrot: [0xf07a22, 'long'], eggplant: [0x4a2a5a, 'long'], zucchini: [0x4f8a32, 'long'], cucumber: [0x3f7a2a, 'long'],
+  mushroom: [0xd8c3a2, 'cap'], greens: [0x4f9a3a, 'bunch'], lemon: [0xf6e05a, 'egg'], fruit: [0xd8322a, 'ball'], cheese: [0xfbf6ea, 'block'],
+  meat: [0xb8323a, 'block'], chicken: [0xf0c2b0, 'block'], fish: [0xf3e3da, 'fillet'], bread: [0xd9a35a, 'block'], veg: [0x6fae4a, 'ball'], nuts: [0xa8763e, 'ball'], corn: [0xf2c430, 'long'],
+};
+export function wholeGeneric(type) {
+  const [col, shape] = WHOLE[type] || [0x8ab05a, 'ball'];
+  const g = new THREE.Group(); const m = phys(col, { roughness: 0.35, clearcoat: 0.4 });
+  let o;
+  if (shape === 'long') { o = mesh(new THREE.CapsuleGeometry(0.016, 0.1, 6, 14), m); o.rotation.z = Math.PI / 2; o.position.y = 0.016; }
+  else if (shape === 'egg') { o = mesh(new THREE.SphereGeometry(0.03, 20, 14), m); o.scale.set(1.25, 0.8, 1); o.position.y = 0.024; }
+  else if (shape === 'block') { o = mesh(new RoundedBoxGeometry(0.1, 0.03, 0.07, 3, 0.012), m); o.position.y = 0.015; }
+  else if (shape === 'fillet') { o = mesh(new RoundedBoxGeometry(0.12, 0.018, 0.06, 3, 0.009), m); o.position.y = 0.009; }
+  else if (shape === 'cap') { o = mesh(new THREE.SphereGeometry(0.025, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), m); o.scale.y = 0.7; }
+  else if (shape === 'bunch') { o = new THREE.Group(); for (let i = 0; i < 12; i++) { const l = mesh(new THREE.SphereGeometry(0.014, 8, 6), m); l.scale.set(1, 0.4, 1); l.position.set(Math.sin(i * 2.3) * 0.025, 0.01 + (i % 3) * 0.005, Math.cos(i * 2.3) * 0.025); o.add(l); } }
+  else { o = mesh(new THREE.SphereGeometry(0.033, 20, 14), m); o.position.y = 0.03; }
+  g.add(o); return g;
 }

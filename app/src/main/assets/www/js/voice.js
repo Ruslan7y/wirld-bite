@@ -39,12 +39,13 @@ const Voice = (() => {
   }
   function stopListen() { try { window.Android && Android.stopListen && Android.stopListen(); } catch (e) {} try { rec && rec.abort(); } catch (e) {} rec = null; }
   WB.onVoice = list => {
+    { const lw = window.__labWin && window.__labWin(); if (lw && lw.LAB_VOICE) { lw.LAB_VOICE((list || [])[0] || ''); return; } }
     const txt = (list || []).join(' ').toLocaleLowerCase(lang);
     let cmd = null; for (const k of ['stop', 'prev', 'repeat', 'timer', 'next']) if (CMD[k].test(txt)) { cmd = k; break; }
     if (cmd && handler) handler(cmd, txt);
     if (on && !speaking) setTimeout(listen, 400);
   };
-  WB.onVoiceEnd = () => { if (on && !speaking) setTimeout(listen, 700); };
+  WB.onVoiceEnd = (e) => { { const lw = window.__labWin && window.__labWin(); if (lw && lw.LAB_VOICE_END) { lw.LAB_VOICE_END(e); return; } } if (on && !speaking) setTimeout(listen, 700); };
 
   return {
     available: () => native() || !!window.speechSynthesis,

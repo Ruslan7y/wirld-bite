@@ -12,6 +12,8 @@ import { RECIPES } from './recipes.js';
 import { GLTFLoader } from '../lib/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from '../lib/jsm/libs/meshopt_decoder.module.js';
 import { makeCarla } from '../real/carla.js';
+import { buildGeneric } from './generic.js';
+import { applySnap, playStep } from './genericPlay.js';
 
 const $ = id => document.getElementById(id);
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -20,7 +22,9 @@ const AUTO = QS.has('auto');
 const GHOST = QS.has('ghost');               // ghost edition                 // test: advance automatically
 const FF = +(QS.get('ff') || 1);
 const SPD = +(QS.get('spd') || 1);          // test: animation speed             // test: timer speed multiplier
-const A = window.Android || null;
+const A = window.LabAndroid || window.Android || null;
+const IN_WB = QS.has('wb');
+function goHome() { stopSpeech(); try { if (IN_WB && window.parent !== window && window.parent.WB_LAB_CLOSE) { window.parent.WB_LAB_CLOSE(); return; } } catch (e) { } location.href = 'index.html' + (GHOST ? '?ghost=1' : ''); }
 const vib = ms => { try { A ? A.vibrate(ms) : navigator.vibrate && navigator.vibrate(ms); } catch (e) { } };
 
 // ---------------- renderer ----------------
@@ -94,7 +98,7 @@ if (REAL) {
 // ---------------- chef ----------------
 const chefId = REAL ? 'carla' : ['leyla', 'zeynep', 'aylin'].includes(QS.get('chef')) ? QS.get('chef') : 'zeynep';
 const ch = REAL ? makeCarla(carlaGLTF, carlaTex, () => camera) : makeCharacter(chefId);
-const STATION = REAL ? { stove: { p: V(0.2, 0, -0.5), r: 0 }, board: { p: V(0.02, 0, -0.43), r: -Math.PI / 2 }, table: { p: TABLE.carla.clone(), r: -0.7 } } : { stove: { p: V(0, 0, -0.56), r: 0 }, board: { p: V(0, 0, -0.56), r: 0 } };
+const STATION = REAL ? { stove: { p: V(0.2, 0, -0.5), r: 0 }, board: { p: V(0.02, 0, -0.43), r: -Math.PI / 2 }, bowl: { p: V(0.12, 0, -0.5), r: -0.45 }, oven: { p: V(0.02, 0, -0.84), r: -Math.PI / 2 }, table: { p: TABLE.carla.clone(), r: -0.7 } } : { stove: { p: V(0, 0, -0.56), r: 0 }, board: { p: V(0, 0, -0.56), r: 0 }, bowl: { p: V(-0.2, 0, -0.56), r: -0.3 }, oven: { p: V(0.3, 0, -0.56), r: 0.5 } };
 ch.root.position.copy(STATION.stove.p);
 scene.add(ch.root);
 const CHEF = REAL ? { name: 'Carla', voice: { pitch: 1.05, rate: 0.97 } } : CHEF_INFO[chefId];
@@ -117,7 +121,21 @@ if (REAL && ruslanGLTF) {
 }
 
 // ---------------- props for the recipe ----------------
-const R = RECIPES[QS.get('r') || 'etsote'];
+// World Bite recipes come from the parent app (iframe) or, for testing, straight from its data files
+const loadScript = src => new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+let SRC = null;
+if (QS.has('wbtest')) {
+  await loadScript('../js/recipes.js'); await loadScript('../js/sigrecipes.js');
+  const code = QS.get('wbtest'), G = (0, eval);
+  if (code.includes('-')) { const r = G('RECIPES').find(x => x.id === code); SRC = { name: r.name.tr, ing: r.ing.tr, st: r.st.tr, s: r.s, time: r.t, key: code }; }
+  else { const g = G('SIG')[code]; SRC = { name: QS.get('name') || code, ing: g.ing, st: g.st, s: g.s, time: g.t, key: code }; }
+} else if (QS.has('wb')) {
+  try { SRC = (window.parent !== window && window.parent.WB_LAB_RECIPE) || null; } catch (e) { }
+  if (SRC) { try { localStorage.setItem('lab_wb_recipe', JSON.stringify(SRC)); } catch (e) { } }
+  else { try { SRC = JSON.parse(localStorage.getItem('lab_wb_recipe') || 'null'); } catch (e) { } }
+}
+const GEN_MODE = !!SRC;
+const R = GEN_MODE ? buildGeneric(SRC, { applySnap, playStep }) : RECIPES[QS.get('r') || 'etsote'];
 if (REAL) K.burner.position.y = -0.03;
 const pan = F.makeSautePan(); pan.position.set(K.cook.position.x, REAL ? 0.032 : 0.044, K.cook.position.z); pan.rotation.y = 0.85; scene.add(pan);
 const lid = F.makeLid(); scene.add(lid);
@@ -129,11 +147,21 @@ const spoon = F.woodenSpoon(), plate = F.servingPlate();
 // piece sets: on the board (chopped), in the bowl (raw meat), in the pan, on the plate, in flight
 const P = {};
 const boardRegion = { onion: [-0.11, 0.06], pepper: [0.0, 0.06], tomato: [0.1, 0.05], garlic: [0.1, -0.06], parsley: [-0.12, -0.07] };
-const COUNTS = { meat: 26, onion: 40, pepper: 22, garlic: 14, tomato: 22, parsley: 70 };
+const NUM = { meat: 26, mince: 40, chicken: 22, fish: 10, shrimp: 20, onion: 40, pepper: 22, garlic: 14, tomato: 22, parsley: 70, potato: 24, carrot: 26, eggplant: 22, zucchini: 22, mushroom: 22, greens: 40, cucumber: 22, corn: 50, legume: 60, rice: 120, pasta: 50, cheese: 24, egg: 24, lemon: 8, fruit: 24, nuts: 30, bread: 16, veg: 24, dough: 6 };
+const COUNTS = {};
+(GEN_MODE ? R.types : ['meat', 'onion', 'pepper', 'garlic', 'tomato', 'parsley']).forEach(t => { if (F.PIECE[t]) COUNTS[t] = NUM[t] || 20; });
+// mixing bowl (generic recipes) with a mound for batters / doughs / liquids
+const bowl = new THREE.Group(); bowl.add(M.makeBowl()); bowl.scale.setScalar(0.85);
+const mound = new THREE.Mesh(new THREE.SphereGeometry(0.13, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshPhysicalMaterial({ color: 0xf2e2bd, roughness: 0.6, clearcoat: 0.3 }));
+mound.position.y = 0.02; mound.scale.y = 0.4; mound.visible = false; bowl.add(mound); bowl.userData.mound = mound;
+bowl.visible = GEN_MODE; scene.add(bowl);
 for (const [t, n] of Object.entries(COUNTS)) {
-  P[t] = { board: new F.Pieces(t, n, K.board), pan: new F.Pieces(t, n, pan), plate: new F.Pieces(t, n, plate), fly: new F.Pieces(t, n, scene) };
+  P[t] = { board: new F.Pieces(t, n, K.board), pan: new F.Pieces(t, n, pan), plate: new F.Pieces(t, n, plate), fly: new F.Pieces(t, n, scene), bowl: new F.Pieces(t, n, bowl), stage: new F.Pieces(t, n, K.meatBowl) };
 }
-P.meat.bowl = new F.Pieces('meat', COUNTS.meat, K.meatBowl);
+if (P.meat) P.meat.bowl0 = P.meat.stage;
+// oven for recipes that bake
+let oven = null;
+if (GEN_MODE && R.plan.steps.some(st => st.ops.some(o => o.op === 'bake'))) { oven = M.makeOven(); oven.scale.setScalar(REAL ? 0.8 : 1); scene.add(oven); }
 
 const spr = TX.sprite(), sprHard = TX.sprite(1), smoke = TX.smokeSprite();
 const spitP = new Particles(scene, { max: 300, map: sprHard, color: 0xfff1c0, gravity: -2.5, drag: 0.5 });
@@ -166,6 +194,27 @@ if (REAL) {
   HOME.get(K.knife).p.set(-0.3, K.boardTop + 0.002, -0.32); HOME.get(K.knife).r.set(-Math.PI / 2, 0, -Math.PI / 2 + 0.3);
   K.vegPlate.position.set(-0.35, 0, -0.8);
 }
+// ---- generic recipe layout: whole ingredients, bowl, oven ----
+const wholes = {};
+if (GEN_MODE) {
+  const named = { onion, pepper, tomato, garlic, parsley };
+  for (const [k, o] of Object.entries(named)) if (!COUNTS[k]) { HOME.delete(o); o.visible = false; }
+  const chopTypes = R.plan.steps.flatMap(st => st.ops.filter(o => o.op === 'chop').map(o => o.type));
+  if (COUNTS.parsley && !chopTypes.includes('parsley')) chopTypes.push('parsley');
+  const spots = REAL ? (oven ? [[-0.58, -0.62], [-0.58, -0.5], [-0.58, -0.74], [-0.5, -0.58], [-0.5, -0.7]] : [[-0.36, -0.82], [-0.46, -0.9], [-0.28, -0.92], [-0.48, -0.76], [-0.38, -1.0], [-0.56, -0.86]])
+                     : [[-0.68, -0.28], [-0.78, -0.2], [-0.6, -0.18], [-0.82, -0.34], [-0.7, -0.4], [-0.9, -0.24]];
+  [...new Set(chopTypes)].forEach((t, i) => {
+    const o = named[t] || F.wholeGeneric(t); if (!named[t]) scene.add(o);
+    wholes[t] = o; const [x, z] = spots[i % spots.length]; home(o, [x, 0.012, z], [0, i * 0.7, 0]); o.visible = true;
+  });
+  K.vegPlate.visible = !REAL || !oven; if (REAL && oven) K.vegPlate.position.set(9, 9, 9);
+  if (!REAL) K.vegPlate.position.set(-0.74, 0, -0.3);
+  home(bowl, REAL ? [-0.12, 0, -0.1] : [-0.58, 0, 0.12]);
+  if (REAL) { HOME.get(K.meatBowl).p.set(-0.32, 0, -0.03); HOME.get(oil).p.set(-0.21, 0, -0.04); HOME.get(water).p.set(-0.62, 0, -0.1); }
+  else { HOME.get(K.meatBowl).p.set(0.02, 0, 0.2); }
+  if (oven) { if (REAL) { oven.position.set(-0.47, 0, -0.86); oven.rotation.y = Math.PI / 2; } else { oven.position.set(0.98, 0, -0.18); oven.rotation.y = -0.6; } }
+}
+const plateSpot = () => REAL ? V(-0.14, 0, -0.16) : V(-0.04, 0, -0.08);
 function resetScene() {
   FOLLOW.clear();
   for (const [o, h] of HOME) { scene.attach(o); o.position.copy(h.p); o.rotation.copy(h.r); o.visible = true; o.scale.setScalar(1); }
@@ -173,7 +222,9 @@ function resetScene() {
   water.userData.water.scale.y = 1; water.userData.water.position.y = 0.045;
   plate.visible = false; lid.visible = true;
   for (const t in P) for (const k in P[t]) { const ps = P[t][k]; ps.count = 0; ps.done = 0; ps.sauce = 0; ps.shrink = 0; }
-  P.meat.bowl.count = COUNTS.meat; P.meat.bowl.scatter(0.055, 0.012, 0.03);
+  if (!GEN_MODE && P.meat) { P.meat.stage.count = COUNTS.meat; }
+  for (const t in P) P[t].stage.scatter(0.055, 0.012, 0.03);
+  for (const t in P) P[t].bowl.scatter(0.1, 0.03, 0.02);
   for (const t in P) { P[t].pan.scatter(F.PAN.rb - 0.02, 0.012, 0.006); P[t].plate.scatter(0.07, 0.012, 0.012); const [bx, bz] = boardRegion[t] || [0, 0]; P[t].board.items.forEach(it => { it.p.set(bx + rand(-0.035, 0.035), K.boardTop + 0.004, bz + rand(-0.03, 0.03)); }); }
   P.parsley.pan.scatter(F.PAN.rb - 0.02, 0.03, 0.01); P.parsley.plate.scatter(0.075, 0.04, 0.012);
   K.setFire(0); K.knobs.forEach(k => k.rotation.z = 0);
@@ -208,13 +259,16 @@ if (REAL) Object.assign(SHOT, {
   plate: { p: [-0.75, 0.62, -0.4], t: [-0.3, 0.03, -0.45], h: 52 },
   wide: { p: [-1.45, 0.76, -2.2], t: [0.35, 0.1, -0.3], h: 52 },
   serve: { p: [0.2, 0.78, 0.3], t: [0.08, 0.02, -0.16], h: 62 },
+  bowl: { p: [0.22, 0.72, 0.22], t: [-0.12, 0.05, -0.12], h: 58 },
+  oven: { p: [-0.05, 0.6, -0.35], t: [-0.42, 0.12, -0.86], h: 58 },
   table: TABLE ? { p: [TABLE.spot.x - 1.05, TABLE.spot.y + 0.62, TABLE.spot.z + 1.45], t: [TABLE.seat.x - 0.12, TABLE.spot.y + 0.3, TABLE.seat.z - 0.2], h: 60 } : { p: [0, 0.5, 1], t: [0, 0, 0], h: 50 },
 });
+if (!REAL) Object.assign(SHOT, { wide: { p: [0.0, 0.95, 2.0], t: [0, 0.2, -0.4], h: 62 }, serve: { p: [0.1, 0.6, 0.55], t: [0.1, 0.03, -0.1], h: 54 }, bowl: { p: [-0.58, 0.62, 0.55], t: [-0.58, 0.03, 0.1], h: 46 }, oven: { p: [0.75, 0.45, 0.6], t: [0.98, 0.15, -0.18], h: 50 } });
 let view = 'front', shotAge = 0;
 function shot(name, dur = 1.2) {
   const s = SHOT[name]; view = name; shotAge = 0;
   const p0 = cam.p.clone(), t0 = cam.t.clone(), h0 = cam.h, p1 = V(...s.p), t1 = V(...s.t);
-  $('pip').classList.toggle('hide', !['board', 'pan', 'stove', 'plate', 'wide', 'serve'].includes(name));
+  $('pip').classList.toggle('hide', !['board', 'pan', 'stove', 'plate', 'wide', 'serve', 'bowl', 'oven'].includes(name));
   return T(dur, k => { cam.p.lerpVectors(p0, p1, k); cam.t.lerpVectors(t0, t1, k); cam.h = lerp(h0, s.h, k); });
 }
 function setShot(name) { const s = SHOT[name]; view = name; cam.p.set(...s.p); cam.t.set(...s.t); cam.h = s.h; }
@@ -434,7 +488,7 @@ window.LAB_ALARM_FIRED = () => { };
 let toastT;
 function toast(s) { const t = $('toast'); t.textContent = s; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 1600); }
 $('bSound').onclick = () => { setMuted(!audio.muted); $('bSound').textContent = audio.muted ? '🔇' : '🔊'; if (audio.muted) stopSpeech(); };
-$('bExit').onclick = () => { stopSpeech(); location.href = 'index.html' + (GHOST ? '?ghost=1' : ''); };
+$('bExit').onclick = () => goHome();
 $('bNext').onclick = () => next();
 $('bPrev').onclick = () => prev();
 $('bRep').onclick = () => repeat();
@@ -452,7 +506,7 @@ let cur = -1;
 const stepState = { waitingTimer: false };
 function ctx(i) {
   return {
-    i, say, W, T, H, shot, guest, scene, GHOST, ghostFinale, quiet: v => { ST.quiet = v; }, fork: () => FORK || (FORK = (() => { const f = M.makeFork(); scene.add(f); return f; })()), moveTo, both, hold, drop, grab, isHeld, release: o => { const f = FOLLOW.get(o); if (f && ch.setGrip) ch.setGrip(f.side, 0.25); FOLLOW.delete(o); }, TABLE, reachTo, wp, ch, K, P, pan, lid, plate, spoon, oil, paste, salt, black, water, onion, pepper, tomato, garlic, parsley,
+    i, say, W, T, H, shot, guest, scene, GHOST, ghostFinale, bowl, oven, wholes, plateSpot, quiet: v => { ST.quiet = v; }, fork: () => FORK || (FORK = (() => { const f = M.makeFork(); scene.add(f); return f; })()), moveTo, both, hold, drop, grab, isHeld, release: o => { const f = FOLLOW.get(o); if (f && ch.setGrip) ch.setGrip(f.side, 0.25); FOLLOW.delete(o); }, TABLE, reachTo, wp, ch, K, P, pan, lid, plate, spoon, oil, paste, salt, black, water, onion, pepper, tomato, garlic, parsley,
     ST, sfx, setLoop, vib, REAL, station, boardHome: () => HOME.get(K.board), startTimer: (min, label) => startTimer(i, min, label), timerFrac, stepState, oilStream, waterStream,
     saltP, pepP, steamP, spitP, setPanLevel: v => panLevel = v, F, M, V, rand, ease, lerp, clamp, chefId,
     waitTimer: async (t, onP, lines = []) => {
@@ -479,11 +533,11 @@ async function go(i, replay = false) {
   try {
     await R.steps[i].play(ctx(i));
     if (g === GEN) { $('bNext').classList.add('pulse'); if (AUTO) setTimeout(() => g === GEN && next(), 600); }
-  } catch (e) { if (e !== ABORT) console.error(e); }
+  } catch (e) { if (e !== ABORT) { console.error(e); toast('⚠️ ' + (e.message || e)); } }
 }
 function next() {
   sfx.tap();
-  if (cur >= R.steps.length - 1) { if (AUTO) return; clearProgress(); stopSpeech(); location.href = 'index.html' + (GHOST ? '?ghost=1' : ''); return; }
+  if (cur >= R.steps.length - 1) { if (AUTO) return; clearProgress(); goHome(); return; }
   go(cur + 1);
 }
 function prev() { sfx.tap(); if (cur > 0) go(cur - 1); }
@@ -618,7 +672,7 @@ function resize() { renderer.setSize(innerWidth, innerHeight, false); allP.forEa
 addEventListener('resize', resize); resize();
 
 window.LAB = {
-  back() { if (alarmOn) { stopAlarm(); return true; } stopSpeech(); location.href = 'index.html' + (GHOST ? '?ghost=1' : ''); return true; },
+  back() { if (alarmOn) { stopAlarm(); return true; } goHome(); return true; },
   pause() { stopSpeech(); ['sizzle', 'boil', 'steam'].forEach(l => setLoop(l, 0)); },
   state: () => ({ step: cur, view, timers: timers.map(t => [t.label, Math.round((t.end - now()) / 1000), t.fired]) }),
   go, next, shot: setShot, ch, V, TABLE: () => TABLE, ghostFly, ghostFinale, gstate: () => ghost ? [ghostBusy, ghost.visible, +ghost.material.opacity.toFixed(2), ghost.position.clone().project(camera).toArray().map(v => +v.toFixed(2)), ghost.material.map.image ? ghost.material.map.image.width : 'noimg', ghost.scale.toArray()] : 'none', cam: (p, t, h) => { SHOT.dbg = { p, t, h }; setShot('dbg'); },
@@ -632,6 +686,13 @@ function clearProgress() { try { localStorage.removeItem(PKEY); } catch (e) { } 
 
 // ---------------- start ----------------
 $('pipName').textContent = CHEF.name;
+if (IN_WB || GEN_MODE) {
+  const row = document.createElement('div'); row.className = 'chefrow';
+  row.innerHTML = [['carla', '👩🏽‍🍳', 'Carla', 'gerçekçi'], ['leyla', '👵', 'Leyla nənə', ''], ['zeynep', '🧕', 'Zeynep teyze', ''], ['aylin', '👩‍🍳', 'Şef Aylin', '']]
+    .map(([id, e, n, sub]) => `<button data-chef="${id}" class="${id === chefId ? 'on' : ''}">${e}<b>${n}</b>${sub ? `<small>${sub}</small>` : ''}</button>`).join('');
+  row.onclick = e => { const b = e.target.closest('button'); if (!b || b.dataset.chef === chefId) return; try { localStorage.setItem('labChef', b.dataset.chef); } catch (x) { } const q = new URLSearchParams(location.search); q.set('chef', b.dataset.chef); location.search = q.toString(); };
+  $('stIng').after(row);
+}
 $('stTitle').textContent = R.title;
 $('stInfo').textContent = `${CHEF.name} ile · ${R.steps.length} adım · ${R.time}`;
 $('stIng').innerHTML = R.ing.map(s => `<li>${s}</li>`).join('');

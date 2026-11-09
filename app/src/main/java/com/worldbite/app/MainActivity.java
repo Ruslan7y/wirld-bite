@@ -50,6 +50,9 @@ public class MainActivity extends Activity {
     private static final int REQ_FILE = 45;
     private ValueCallback<Uri[]> fileCallback;
     private TextToSpeech tts;
+    static volatile boolean inForeground = false;
+    static MainActivity self;
+    static void notifyJs(String code) { MainActivity a = self; if (a != null) a.js(code); }
     private boolean ttsReady = false;
     private SpeechRecognizer recognizer;
     private String pendingListenLang;
@@ -82,12 +85,14 @@ public class MainActivity extends Activity {
         s.setTextZoom(100);
 
         web.addJavascriptInterface(new Bridge(), "Android");
+        web.addJavascriptInterface(new LabBridge(), "LabAndroid");
+        self = this;
         tts = new TextToSpeech(this, status -> {
             ttsReady = status == TextToSpeech.SUCCESS;
             if (ttsReady) tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                 @Override public void onStart(String id) { }
-                @Override public void onDone(String id) { js("WB.onSpeakDone && WB.onSpeakDone()"); }
-                @Override public void onError(String id) { js("WB.onSpeakDone && WB.onSpeakDone()"); }
+                @Override public void onDone(String id) { speakDone(id); }
+                @Override public void onError(String id) { speakDone(id); }
             });
         });
 
@@ -184,6 +189,71 @@ public class MainActivity extends Activity {
         if (requestCode == REQ_FILE && fileCallback != null) {
             fileCallback.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data));
             fileCallback = null;
+        }
+    }
+
+    private void speakDone(String id) {
+        if (id != null && id.startsWith("lab:")) js("window.LAB_TTS_DONE && LAB_TTS_DONE(" + JSONObject.quote(id.substring(4)) + ")");
+        else js("WB.onSpeakDone && WB.onSpeakDone()");
+    }
+
+    @Override
+    protected void onResume() { super.onResume(); inForeground = true; ((android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE)).cancelAll(); }
+
+    @Override
+    protected void onPause() { super.onPause(); inForeground = false; js("window.LAB_PAUSE && LAB_PAUSE()"); }
+
+    private android.app.PendingIntent alarmPi(int id, String title, String text) {
+        Intent i = new Intent(this, AlarmReceiver.class).setAction(AlarmReceiver.FIRE).putExtra("id", id).putExtra("title", title).putExtra("text", text);
+        return android.app.PendingIntent.getBroadcast(this, id, i, android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    /** Bridge used by the cooking scene (lab/chef.html) inside World Bite. */
+    private class LabBridge {
+        @JavascriptInterface
+        public void vibrate(int ms) {
+            android.os.Vibrator v = (android.os.Vibrator) getSystemService(VIBRATOR_SERVICE);
+            if (v == null) return;
+            if (Build.VERSION.SDK_INT >= 26) v.vibrate(android.os.VibrationEffect.createOneShot(Math.max(5, ms), android.os.VibrationEffect.DEFAULT_AMPLITUDE)); else v.vibrate(ms);
+        }
+        @JavascriptInterface
+        public void speak(final String text, final float pitch, final float rate, final String id) {
+            runOnUiThread(() -> {
+                if (!ttsReady) { speakDone("lab:" + id); return; }
+                if (tts.setLanguage(new Locale("tr", "TR")) < 0) tts.setLanguage(Locale.getDefault());
+                tts.setPitch(pitch); tts.setSpeechRate(rate);
+                tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "lab:" + id);
+            });
+        }
+        @JavascriptInterface public void stopSpeak() { runOnUiThread(() -> { if (tts != null) tts.stop(); }); }
+        @JavascriptInterface
+        public void listen(final String lang) {
+            runOnUiThread(() -> {
+                if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                    pendingListenLang = lang; requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQ_MIC); return;
+                }
+                startListening(lang);
+            });
+        }
+        @JavascriptInterface public void stopListen() { runOnUiThread(() -> { if (recognizer != null) { try { recognizer.cancel(); } catch (Exception ignored) { } } }); }
+        @JavascriptInterface
+        public void scheduleAlarm(int id, double whenMs, String title, String text) {
+            if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED)
+                runOnUiThread(() -> requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 52));
+            android.app.AlarmManager am = (android.app.AlarmManager) getSystemService(ALARM_SERVICE);
+            if (am == null) return;
+            android.app.PendingIntent pi = alarmPi(id, title, text);
+            long when = (long) whenMs;
+            try {
+                if (Build.VERSION.SDK_INT >= 31 && !am.canScheduleExactAlarms()) am.setAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, when, pi);
+                else am.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, when, pi);
+            } catch (SecurityException e) { am.set(android.app.AlarmManager.RTC_WAKEUP, when, pi); }
+        }
+        @JavascriptInterface
+        public void cancelAlarm(int id) {
+            android.app.AlarmManager am = (android.app.AlarmManager) getSystemService(ALARM_SERVICE);
+            if (am != null) am.cancel(alarmPi(id, "", ""));
+            ((android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE)).cancel(id);
         }
     }
 
@@ -295,6 +365,7 @@ public class MainActivity extends Activity {
                     // Azerbaijani voices are rare: fall back to Turkish, then English
                     if (tts.setLanguage(new Locale("tr", "TR")) < 0) tts.setLanguage(Locale.ENGLISH);
                 }
+                tts.setPitch(1f); tts.setSpeechRate(1f);
                 tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "wb" + System.currentTimeMillis());
             });
         }
