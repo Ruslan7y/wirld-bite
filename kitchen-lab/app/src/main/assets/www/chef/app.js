@@ -422,7 +422,7 @@ function say(raw, note = '', who = null) {
   sp.speaking = true;
   return new Promise((res, rej) => {
     let finished = false;
-    const done = () => { if (finished) return; finished = true; sp.speaking = false; if (g !== GEN) rej(ABORT); else setTimeout(res, 250); };
+    const done = () => { if (finished) return; finished = true; sp.speaking = false; if (g !== GEN) rej(ABORT); else setTimeout(() => g === GEN ? res() : rej(ABORT), 250); };
     speakDone = done;
     const est = 900 + text.length * 62;
     if (!audio.muted && A && A.speak) { try { A.speak(text, voice.pitch, voice.rate, String(id)); setTimeout(done, est * 1.35 + 1500); return; } catch (e) { } }
