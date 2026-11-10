@@ -70,7 +70,7 @@ export async function fly(c, src, dst, n, dur = 0.9, spread = 0.5) {
   const sp = src.mesh.parent, dp = dst.mesh.parent; sp.updateMatrixWorld(); dp.updateMatrixWorld();
   const A = [], B = [];
   for (let k = 0; k < n; k++) { A.push(sp.localToWorld(src.items[src.count - 1 - k].p.clone())); B.push(dp.localToWorld(dst.items[dst.count + k].p.clone())); }
-  src.count -= n; fl.count = n; fl.done = src.done; fl.sauce = src.sauce; fl.shrink = src.shrink;
+  src.count -= n; fl.count = n; fl.done = src.done; fl.sauce = src.sauce; fl.shrink = src.shrink; fl.grow = src.grow || 0;
   const del = A.map(() => Math.random() * spread);
   await c.T(dur + spread, (_, r) => {
     const t = r * (dur + spread);
@@ -80,7 +80,7 @@ export async function fly(c, src, dst, n, dur = 0.9, spread = 0.5) {
       it.r.x += 0.15; it.r.z += 0.1;
     }
   }, c.ease.linear);
-  fl.count = 0; dst.count += n; dst.done = src.done; dst.sauce = src.sauce;
+  fl.count = 0; dst.count += n; dst.done = src.done; dst.sauce = src.sauce; dst.grow = src.grow || 0;
 }
 
 // lift the board over the pan, tip the chopped pieces in, bring it back
