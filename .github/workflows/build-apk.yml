@@ -3,7 +3,7 @@ name: Build APK
 on:
   push:
     branches: [ main ]
-    paths-ignore: [ '.github/workflows/build-lab.yml' ]
+    paths-ignore: [ '.github/workflows/build-lab.yml', 'kitchen-lab/**' ]
   workflow_dispatch:
 
 permissions:
@@ -25,12 +25,6 @@ jobs:
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           ls "$ANDROID_HOME/platforms" || true
 
-      - name: Bundle the 3D cooking scene (Kitchen Lab) into World Bite
-        run: |
-          rm -rf app/src/main/assets/www/lab
-          cp -r kitchen-lab/app/src/main/assets/www app/src/main/assets/www/lab
-          du -sh app/src/main/assets/www/lab
-
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
@@ -49,8 +43,8 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.8.${{ github.run_number }}
-          name: World Bite v1.8.${{ github.run_number }}
+          tag_name: v1.9.${{ github.run_number }}
+          name: World Bite v1.9.${{ github.run_number }}
           body: |
             📱 **World Bite** Android APK — telefona indir ve yükle.
             Download `WorldBite.apk` below and open it on your Android phone.

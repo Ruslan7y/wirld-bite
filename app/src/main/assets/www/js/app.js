@@ -191,7 +191,6 @@ function pushPage(html, mount, cls) {
   return el;
 }
 function back() {
-  { const w = labWin(); if (w) { try { if (w.LAB && w.LAB.back) { w.LAB.back(); return true; } } catch (e) { } closeLab(); return true; } }
   if (sheetOpen()) { closeSheet(); return true; }
   if (stack.length) { const el = stack.pop(); if (el._onClose) el._onClose(); el.classList.add('out'); setTimeout(() => el.remove(), 240); return true; }
   if ($('#main').classList.contains('show') && state.tab !== 'explore') { setTab('explore'); return true; }
@@ -205,7 +204,7 @@ function back() {
   if ($('#onboarding').classList.contains('show') && ob.i > 0) { obGo(ob.i - 1); return true; }
   return false;
 }
-window.WB = Object.assign(window.WB || {}, { back });
+window.WB = Object.assign(window.WB || {}, { back, get openRecipe() { return openRecipe; }, get openKitchenMenu() { return openKitchenMenu; }, get planAll() { return typeof planAll === 'function' ? planAll : null; } });
 function show(id) { $$('.screen').forEach(s => s.classList.toggle('show', s.id === id)); }
 
 /* ================= SPLASH ================= */
@@ -355,7 +354,7 @@ const TABS = ['explore', 'travel', 'pantry', 'list', 'settings'];
 function enterApp() {
   $('#tabbar').innerHTML = TABS.map(k => `<button data-tab="${k}">${I[k]}<span>${t('tab' + k[0].toUpperCase() + k.slice(1))}</span></button>`).join('');
   $$('#tabbar button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
-  show('main'); setTimeout(offerLabResume, 1200);
+  show('main'); setTimeout(offerResume, 1200);
   renderExplore(); renderTravel(); renderPantry(); renderList(); renderSettings();
   setTab(state.tab);
   if (!store.get('ageSkipped', false)) setTimeout(() => askAge(), 3800);
@@ -595,11 +594,12 @@ function recipeHTML(rc, title) {
     <div class="serv"><span>👥 ${t('servingsFor')}</span><button data-sv="-1" aria-label="-">−</button><b class="svn">${rc.cur}</b><button data-sv="1" aria-label="+">+</button></div>
     ${rc.tr && (lang === 'en' || lang === 'ru') ? `<p class="note">${t('sigLangNote')}</p>` : ''}
     <button class="btn primary block cook-btn" data-cook>👩‍🍳 ${t('startCooking')}</button>
+    <button class="btn ghost block cf-vidbtn" data-video>📺 ${CookFlow.label('video')}</button>
     <div class="prog"><i class="rProg"></i></div>
     <div class="block"><h3>🧺 ${t('ingredients')} <small class="cnt">${rc.ing.length}</small></h3><ul class="ing">${rc.ing.map(x => `<li><span class="box">✓</span><span class="it">${esc(scaleLine(x, rc.cur / rc.s))}</span></li>`).join('')}</ul><p class="note">👆 ${t('tapHint')}</p>
       <button class="btn line block shop-btn" data-shop>🛒 ${t('addMissing')}</button>
       ${rc.cat !== 't' && rc.key && /^[cr]/.test(rc.key) ? `<button class="btn ghost block shop-btn" data-menu>➕ ${t('addSide')}</button>` : ''}</div>
-    <div class="block" style="animation-delay:.08s"><h3>🔥 ${t('steps')} <small class="cnt">${rc.st.length}</small></h3><ol class="steps">${rc.st.map((x, i) => `<li><span class="n">${i + 1}</span><span>${esc(x)}</span></li>`).join('')}</ol></div>`;
+    <div class="block" style="animation-delay:.08s"><h3>🔥 ${t('steps')} <small class="cnt">${rc.st.length}</small></h3><ol class="steps">${rc.st.map((x, i) => { const tp = Tips.forStep(x, cl()); return `<li><span class="n">${i + 1}</span><span>${esc(x)}${tp.cue ? `<small class="st-cue">🎯 ${esc(tp.cue)}</small>` : ''}<small class="st-tip">💡 ${esc(tp.tip)}</small></span></li>`; }).join('')}</ol></div>`;
 }
 function saveScore(key, final, earned) {
   const g = store.get('gstats', { total: 0, best: {}, games: 0 });
@@ -620,54 +620,28 @@ function dietHTML(d) {
 }
 function openKitchen(rc, name, extra) {
   extra = extra || {};
-  // the 3D cooking scene (lab/chef.html) reads this recipe and plays every step
-  window.WB_LAB_RECIPE = { name, ing: rc.ing.map(l => scaleLine(l, (rc.cur || rc.s) / rc.s)), st: rc.st.slice(), s: rc.cur || rc.s, time: rc.t, key: rc.key || name, code: extra.code || '', country: extra.country || '' };
-  let chef = 'carla'; try { chef = localStorage.getItem('labChef') || 'carla'; } catch (e) { }
-  openLab(`lab/chef.html?wb=1&chef=${chef}`);
+  // step-by-step cooking flow: every step with its ingredients, consistency cue, tip and timer
+  CookFlow.open({ name, ing: rc.ing.map(l => scaleLine(l, (rc.cur || rc.s) / rc.s)), st: rc.st.slice(), key: rc.key || name, country: extra.code || '' });
 }
-// menu: main dish + side cooked together in the 3D kitchen (the side is made while the main dish waits)
+// menu: main dish + side together (the side is made while the main dish waits)
 function openKitchenMenu(m, sd) {
-  const src = x => ({ name: x.name, ing: x.ing.slice(), st: x.st.slice(), s: x.s, time: x.tot || x.t || 30, key: x.key, country: x.country || '' });
-  window.WB_LAB_RECIPE = Object.assign(src(m), { side: src(sd) });
-  let chef = 'carla'; try { chef = localStorage.getItem('labChef') || 'carla'; } catch (e) { }
-  openLab(`lab/chef.html?wb=1&chef=${chef}`);
+  const src = x => ({ name: x.name, ing: x.ing.slice(), st: (x.stShow || x.st).slice(), key: x.key, country: x.country || '' });
+  CookFlow.open(src(m), src(sd));
 }
-/* ---------- 3D cooking scene overlay ---------- */
-let labFrame = null;
-function openLab(url) {
-  if (!labFrame) {
-    labFrame = document.createElement('iframe'); labFrame.id = 'labFrame'; labFrame.setAttribute('allow', 'autoplay; microphone');
-    labFrame.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:0;z-index:9999;background:#140f0c;display:none';
-    document.body.appendChild(labFrame);
-  }
-  labFrame.src = url; labFrame.style.display = 'block'; keepAwake(true);
-}
-function closeLab() { if (!labFrame) return; labFrame.style.display = 'none'; labFrame.src = 'about:blank'; keepAwake(false); try { Android && Android.stopSpeak && Android.stopSpeak(); } catch (e) { } }
-const labWin = () => labFrame && labFrame.style.display !== 'none' ? labFrame.contentWindow : null;
-window.WB_LAB_CLOSE = closeLab; window.__labWin = labWin;
-// native callbacks arrive in this (top) window: pass them to the scene
-window.LAB_TTS_DONE = id => { const w = labWin(); w && w.LAB_TTS_DONE && w.LAB_TTS_DONE(id); };
-window.LAB_ALARM_FIRED = id => { const w = labWin(); w && w.LAB_ALARM_FIRED && w.LAB_ALARM_FIRED(id); };
-window.LAB_PAUSE = () => { const w = labWin(); w && w.LAB && w.LAB.pause && w.LAB.pause(); };
-function labResumeInfo() {
-  try {
-    const p = JSON.parse(localStorage.getItem('lab_progress') || 'null'), r = JSON.parse(localStorage.getItem('lab_wb_recipe') || 'null');
-    if (p && r && p.r === 'wb-' + (r.key || r.name) && p.step > 0 && Date.now() - p.at < 6 * 3600e3) return { p, r };
-  } catch (e) { }
-  return null;
-}
-function offerLabResume() {
-  const info = labResumeInfo(); if (!info) return;
+CookFlow.init({ get lang() { return lang; }, cl, pushPage, back, stack: () => stack, toast, esc, shortIng, keepAwake, onCooked });
+function offerResume() {
+  const p = CookFlow.pending(); if (!p) return;
   const bar = document.createElement('div');
-  bar.style.cssText = 'position:fixed;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 84px);z-index:900;background:var(--p,#ff7a45);color:#fff;border-radius:16px;padding:12px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,.25);font:600 14px system-ui';
-  bar.innerHTML = `<span style="font-size:22px">👩‍🍳</span><span style="flex:1">${esc(info.r.name)} · ${lang === 'en' ? 'continue where you left off' : lang === 'ru' ? 'продолжить с места остановки' : lang === 'az' ? 'qaldığın yerdən davam et' : 'kaldığın yerden devam et'}</span><b style="font-size:18px">▶</b><span data-x style="opacity:.8;padding:0 4px">✕</span>`;
-  bar.onclick = e => { bar.remove(); if (e.target.dataset.x !== undefined) return; window.WB_LAB_RECIPE = info.r; openLab(`lab/chef.html?wb=1&chef=${info.p.chef}&resume=1`); };
+  bar.className = 'cf-resume';
+  bar.innerHTML = `<span style="font-size:22px">👩‍🍳</span><span style="flex:1">${esc(p.side ? p.dish.name + ' + ' + p.side.name : p.dish.name)} · ${CookFlow.contLabel()}</span><b style="font-size:18px">▶</b><span data-x style="opacity:.8;padding:0 4px">✕</span>`;
+  bar.onclick = e => { bar.remove(); if (e.target.dataset.x !== undefined) { try { localStorage.removeItem('cf_state'); } catch (er) { } return; } CookFlow.resume(p); };
   document.body.appendChild(bar); setTimeout(() => bar.remove(), 20000);
 }
 function bindRecipe(el, rc, name, extra) {
   const upd = () => { const all = $$('.ing li,.steps li', el), d = all.filter(x => x.classList.contains('done')); $$('.rProg', el).forEach(p => p.style.width = (d.length / all.length * 100) + '%'); };
   $$('.ing li,.steps li', el).forEach(li => li.onclick = () => { li.classList.toggle('done'); upd(); });
   $$('[data-cook]', el).forEach(b => b.onclick = () => openKitchen(rc, name, extra));
+  $$('[data-video]', el).forEach(b => b.onclick = () => { location.href = CookFlow.videoUrl({ name }); });
   const its = $$('.ing li .it', el);
   const setS = v => { rc.cur = Math.max(1, Math.min(60, v)); const f = rc.cur / rc.s; its.forEach((x, i) => { x.textContent = scaleLine(rc.ing[i], f); x.classList.remove('flash'); void x.offsetWidth; x.classList.add('flash'); }); $$('.svn', el).forEach(x => x.textContent = rc.cur); };
   $$('[data-sv]', el).forEach(b => b.onclick = () => setS(rc.cur + (+b.dataset.sv)));
@@ -1569,7 +1543,7 @@ function renderSettings() {
       <button class="row" id="sIntro"><span class="ri">${I.replay}</span><span class="lbl">${t('replayIntro')}</span>${I.chev}</button>
       <button class="row" id="sCache"><span class="ri">${I.trash}</span><span class="lbl">${t('clearCache')}</span>${I.chev}</button>
       <button class="row danger" id="sOut"><span class="ri">${I.logout}</span><span class="lbl">${t('logout')}</span></button></div>
-    <div class="group"><h4>${t('about2')}</h4><div class="row"><span class="ri">${I.info}</span><span class="lbl">World Bite</span><small>${t('version')} 1.8.0</small></div><p class="credits">${t('credits')}</p></div>`;
+    <div class="group"><h4>${t('about2')}</h4><div class="row"><span class="ri">${I.info}</span><span class="lbl">World Bite</span><small>${t('version')} 1.9.0</small></div><p class="credits">${t('credits')}</p></div>`;
   $$('[data-chef]').forEach(b => b.onclick = () => { store.set('chefMode', b.dataset.chef); renderSettings(); });
   $$('[data-cm]').forEach(b => b.onclick = () => { store.set('chefMode', b.dataset.cm); renderSettings(); });
   $('#sAge').onclick = () => askAge(true);
